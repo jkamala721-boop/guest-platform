@@ -17,11 +17,11 @@ public interface GuestRepository extends JpaRepository<Guest, UUID> {
     @Query("""
             select guest from Guest guest
             where guest.host.id = :hostId
-              and (:query is null or lower(guest.fullName) like lower(concat('%', :query, '%'))
+              and (coalesce(:query, '') = '' or lower(guest.fullName) like lower(concat('%', :query, '%'))
                    or lower(guest.email) like lower(concat('%', :query, '%'))
                    or guest.phone like concat('%', :query, '%'))
-              and (:nationality is null or lower(guest.nationality) = lower(:nationality))
-              and (:idType is null or lower(guest.idType) = lower(:idType))
+              and (coalesce(:nationality, '') = '' or lower(guest.nationality) = lower(:nationality))
+              and (coalesce(:idType, '') = '' or lower(guest.idType) = lower(:idType))
             order by guest.createdAt desc
             """)
     List<Guest> findAllForHost(@Param("hostId") UUID hostId, @Param("query") String query,

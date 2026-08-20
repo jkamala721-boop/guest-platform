@@ -40,25 +40,10 @@ class PhaseTwoIntegrationTest {
         String ownerToken = register("phase2-owner@example.com", "Phase Two Owner");
         String guestId = createGuest(ownerToken, "Ada Guest");
 
-        mockMvc.perform(get("/api/guests").header("Authorization", bearer(ownerToken)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(guestId))
-                .andExpect(jsonPath("$[0].fullName").value("Ada Guest"))
-                .andExpect(jsonPath("$[0].idNumber").doesNotExist())
-                .andExpect(jsonPath("$[0].notes").doesNotExist());
-
         mockMvc.perform(get("/api/guests/{guestId}", guestId).header("Authorization", bearer(ownerToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.idNumber").value("A1234567"))
                 .andExpect(jsonPath("$.hostId").doesNotExist());
-
-        mockMvc.perform(get("/api/guests")
-                        .queryParam("query", "ada")
-                        .queryParam("nationality", "kenyan")
-                        .queryParam("idType", "passport")
-                        .header("Authorization", bearer(ownerToken)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(guestId));
 
         Map<String, Object> update = guestPayload("Ada Updated");
         update.put("notes", "Late arrival requested");
@@ -74,6 +59,35 @@ class PhaseTwoIntegrationTest {
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/guests/{guestId}", guestId).header("Authorization", bearer(ownerToken)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listWithoutOptionalFiltersReturnsExistingGuestsForAuthenticatedHost() throws Exception {
+        String token = register("phase2-list-unfiltered@example.com", "Unfiltered List Host");
+        String guestId = createGuest(token, "Unfiltered Guest");
+
+        mockMvc.perform(get("/api/guests").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(guestId))
+                .andExpect(jsonPath("$[0].fullName").value("Unfiltered Guest"))
+                .andExpect(jsonPath("$[0].idNumber").doesNotExist())
+                .andExpect(jsonPath("$[0].notes").doesNotExist());
+    }
+
+    @Test
+    void listSupportsOptionalFiltersForAuthenticatedHostsGuests() throws Exception {
+        String token = register("phase2-list-filtered@example.com", "Filtered List Host");
+        String matchingGuestId = createGuest(token, "Ada Filtered");
+        createGuest(token, "Other Guest");
+
+        mockMvc.perform(get("/api/guests")
+                        .queryParam("query", "filtered")
+                        .queryParam("nationality", "kenyan")
+                        .queryParam("idType", "passport")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(matchingGuestId))
+                .andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test
