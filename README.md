@@ -23,3 +23,15 @@ See:
 - `docs/API_SPEC.md`
 - `docs/SECURITY.md`
 - `docs/ROADMAP.md`
+
+## Local database configuration
+
+Copy `.env.example` to `.env`, then replace its placeholders using the connection
+details from the Supabase **Connect** panel. The `.env` file is ignored by Git;
+use environment variables instead when deploying.
+
+Run the Phase 0 checks with:
+
+```powershell
+.\mvnw.cmd test
+```
