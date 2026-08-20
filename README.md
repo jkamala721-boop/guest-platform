@@ -1,21 +1,25 @@
-# Guest Platform
+# Hostvero
 
-A mobile-first guest registration, booking, payment and check-in management platform for short-term rental hosts.
+Hostvero is a host-only guest management platform for short-term rental operators, serviced apartments, guesthouses, and small hotels.
 
-## Current Status
-
-Phase 1 — Foundation
+## Stack
 
 - Java 21
 - Spring Boot
 - Maven
-- Git
-- GitHub
-- Basic health API
+- PostgreSQL / Supabase
+- HTML
+- CSS
+- JavaScript
 
-## Running Locally
+## Development documentation
 
-Start the application with:
+See:
 
-```bash
-mvn spring-boot:run
+- `AGENTS.md`
+- `docs/PRODUCT_SPEC.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DATABASE.md`
+- `docs/API_SPEC.md`
+- `docs/SECURITY.md`
+- `docs/ROADMAP.md`
