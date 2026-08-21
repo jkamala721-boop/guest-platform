@@ -154,7 +154,26 @@ function renderGuestUnavailable() { app.innerHTML = `<main class="public-page sa
 
 function notificationLabel(type) { return ({ TWO_DAY_REMINDER: 'Two-day arrival reminder', TWENTY_FOUR_HOUR_PAYMENT_REQUEST: '24-hour payment request', PAYMENT_REMINDER: 'Payment reminder', CHECKOUT_REMINDER: 'Checkout reminder' })[type] || titleCase(type); }
 function guestLinkState(value) { return value === 'REGISTRATION_OR_PAYMENT' ? 'Guest registration and payment link ready' : titleCase(value); }
-function handleFormError(error, form) { const message = error instanceof ApiError ? error.message : 'Something went wrong. Please try again.'; $$('.field-error', form).forEach(item => item.remove()); if (error.details) Object.entries(error.details).forEach(([key, value]) => { const field = $(`[name="${key}"]`, form); if (field) { const detail = document.createElement('span'); detail.className = 'help field-error'; detail.style.color = 'var(--hv-danger)'; detail.textContent = value; field.after(detail); } }); toast('Please check the highlighted fields.', 'error'); } else toast(message, 'error'); }
+function handleFormError(error, form) {
+  const message = error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+  $$('.field-error', form).forEach(item => item.remove());
+
+  if (error.details) {
+    Object.entries(error.details).forEach(([key, value]) => {
+      const field = $(`[name="${key}"]`, form);
+      if (field) {
+        const detail = document.createElement('span');
+        detail.className = 'help field-error';
+        detail.style.color = 'var(--hv-danger)';
+        detail.textContent = value;
+        field.after(detail);
+      }
+    });
+    toast('Please check the highlighted fields.', 'error');
+  } else {
+    toast(message, 'error');
+  }
+}
 function showHostError(route, error) { if (error?.status === 401) { session.clear(); state.host = null; go('login'); toast('Your session has expired.', 'error'); return; } app.innerHTML = hostShell(route, `${heading(pageTitle(route))}${emptyState('!', 'Unable to load this page', 'Please try again in a moment.', '<button class="button" type="button" id="retry-page">Try again</button>')}`); bindShell(); $('#retry-page').addEventListener('click', renderRoute); }
 function bindShell() { $('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Session is cleared regardless. */ } session.clear(); state.host = null; go('login'); }); }
 
