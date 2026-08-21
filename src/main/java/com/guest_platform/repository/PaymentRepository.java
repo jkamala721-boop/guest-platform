@@ -13,12 +13,17 @@ import org.springframework.data.repository.query.Param;
 
 import com.guest_platform.entity.Payment;
 import com.guest_platform.entity.PaymentProvider;
+import com.guest_platform.entity.PaymentStatus;
 
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     List<Payment> findAllByBookingIdAndHostIdOrderByCreatedAtDesc(UUID bookingId, UUID hostId);
 
     Optional<Payment> findByIdAndHostId(UUID id, UUID hostId);
+
+    Optional<Payment> findFirstByBookingIdOrderByCreatedAtDesc(UUID bookingId);
+
+    boolean existsByBookingIdAndStatus(UUID bookingId, PaymentStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select payment from Payment payment where payment.provider = :provider "

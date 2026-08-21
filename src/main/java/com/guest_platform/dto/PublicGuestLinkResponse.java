@@ -1,12 +1,9 @@
 package com.guest_platform.dto;
 
-import java.time.Instant;
-
-import com.guest_platform.entity.GuestLink;
-import com.guest_platform.entity.GuestLinkState;
-
-public record PublicGuestLinkResponse(GuestLinkState state, Instant expiresAt) {
-    public static PublicGuestLinkResponse from(GuestLink guestLink) {
-        return new PublicGuestLinkResponse(guestLink.getState(), guestLink.getExpiresAt());
-    }
+/**
+ * A state-specific public guest-link response. Implementations intentionally do
+ * not expose internal identifiers or guest PII.
+ */
+public sealed interface PublicGuestLinkResponse permits PublicGuestRegistrationOrPaymentResponse,
+        PublicGuestStayResponse {
 }

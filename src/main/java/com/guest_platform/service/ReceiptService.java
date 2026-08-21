@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.guest_platform.dto.PublicReceiptResponse;
 import com.guest_platform.dto.ReceiptResponse;
 import com.guest_platform.entity.GuestLink;
+import com.guest_platform.entity.GuestLinkState;
 import com.guest_platform.entity.Payment;
 import com.guest_platform.entity.Receipt;
 import com.guest_platform.exception.ResourceNotFoundException;
@@ -56,6 +57,9 @@ public class ReceiptService {
     @Transactional(readOnly = true)
     public PublicReceiptResponse getPublic(String token) {
         GuestLink guestLink = guestLinkService.resolveUsableGuestLink(token);
+        if (guestLink.getState() != GuestLinkState.STAY_ACTIVE) {
+            throw new ResourceNotFoundException("Receipt was not found");
+        }
         Receipt receipt = receiptRepository.findByBookingIdAndHostId(guestLink.getBooking().getId(),
                 guestLink.getBooking().getHost().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Receipt was not found"));

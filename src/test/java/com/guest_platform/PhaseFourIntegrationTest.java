@@ -141,9 +141,10 @@ class PhaseFourIntegrationTest {
         String otherToken = register("phase4-stripe-other@example.com", "Receipt Other Host");
         mockMvc.perform(get("/api/receipts/{receiptId}", receiptId).header("Authorization", bearer(otherToken)))
                 .andExpect(status().isNotFound());
-        String rotatedToken = createGuestLink(ownerToken, bookingId);
-        mockMvc.perform(get("/api/public/guest/{token}/receipt", guestToken)).andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/public/guest/{token}/receipt", rotatedToken)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/bookings/{bookingId}/guest-link", bookingId)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isConflict());
+        mockMvc.perform(get("/api/public/guest/{token}/receipt", guestToken)).andExpect(status().isOk());
         mockMvc.perform(get("/api/public/guest/{token}/receipt", "not-a-valid-token")).andExpect(status().isNotFound());
 
         String secondBookingId = createBooking(ownerToken, propertyId, guestId, LocalDate.now().plusDays(85),

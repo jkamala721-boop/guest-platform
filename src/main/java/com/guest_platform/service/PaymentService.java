@@ -30,13 +30,16 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
     private final ReceiptService receiptService;
+    private final GuestLinkService guestLinkService;
     private final Map<PaymentProvider, PaymentProviderAdapter> providers;
 
     public PaymentService(BookingRepository bookingRepository, PaymentRepository paymentRepository,
-            ReceiptService receiptService, List<PaymentProviderAdapter> providerAdapters) {
+            ReceiptService receiptService, GuestLinkService guestLinkService,
+            List<PaymentProviderAdapter> providerAdapters) {
         this.bookingRepository = bookingRepository;
         this.paymentRepository = paymentRepository;
         this.receiptService = receiptService;
+        this.guestLinkService = guestLinkService;
         this.providers = providerAdapters.stream().collect(Collectors.toMap(PaymentProviderAdapter::provider,
                 Function.identity(), (first, ignored) -> first, () -> new EnumMap<>(PaymentProvider.class)));
     }
@@ -82,7 +85,10 @@ public class PaymentService {
         if (request.success()) {
             payment.markSucceeded(eventId);
             payment.getBooking().confirmAfterVerifiedPayment();
-            receiptService.createForSucceededPayment(payment);
+            if (payment.getStatus() == com.guest_platform.entity.PaymentStatus.SUCCEEDED) {
+                receiptService.createForSucceededPayment(payment);
+                guestLinkService.activateForConfirmedBooking(payment.getBooking());
+            }
         } else {
             payment.markFailed(eventId, normalizeFailureReason(request.failureReason()));
         }

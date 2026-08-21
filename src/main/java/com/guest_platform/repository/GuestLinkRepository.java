@@ -12,4 +12,5 @@ import com.guest_platform.entity.GuestLinkState;
 public interface GuestLinkRepository extends JpaRepository<GuestLink, UUID> {
     Optional<GuestLink> findByTokenHash(String tokenHash);
     List<GuestLink> findAllByBookingIdAndStateNot(UUID bookingId, GuestLinkState state);
+    List<GuestLink> findAllByBookingIdAndState(UUID bookingId, GuestLinkState state);
 }

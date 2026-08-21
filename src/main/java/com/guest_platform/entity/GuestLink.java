@@ -79,6 +79,12 @@ public class GuestLink {
         state = GuestLinkState.EXPIRED;
     }
 
+    public void activate() {
+        if (state == GuestLinkState.REGISTRATION_OR_PAYMENT && revokedAt == null) {
+            state = GuestLinkState.STAY_ACTIVE;
+        }
+    }
+
     public boolean isUsableAt(Instant now) {
         return (state == GuestLinkState.REGISTRATION_OR_PAYMENT || state == GuestLinkState.STAY_ACTIVE)
                 && revokedAt == null && expiresAt.isAfter(now);

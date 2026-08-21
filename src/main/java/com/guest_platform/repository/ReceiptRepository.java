@@ -16,5 +16,7 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
 
     Optional<Receipt> findByBookingIdAndHostId(UUID bookingId, UUID hostId);
 
+    Optional<Receipt> findByBookingId(UUID bookingId);
+
     Optional<Receipt> findByPaymentId(UUID paymentId);
 }
