@@ -9,7 +9,7 @@
 .button-row { display: flex; flex-wrap: wrap; gap: .7rem; }
 .grid { display: grid; gap: 1rem; }
 .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1.5rem; }
-.stat-card { min-height: 132px; padding: 1.15rem; }
+.stat-card { min-height: 116px; padding: 1rem 1.15rem; }
 .stat-card .stat-label { color: var(--hv-text-muted); font-size: .83rem; font-weight: 700; }
 .stat-card .stat-value { margin: .5rem 0 0; font-size: 1.85rem; font-weight: 800; letter-spacing: -.055em; }
 .stat-card .stat-note { color: var(--hv-teal-dark); font-size: .76rem; font-weight: 700; }
@@ -36,7 +36,7 @@ input, select, textarea { width: 100%; border: 1px solid var(--hv-border); borde
 textarea { min-height: 92px; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--hv-teal); box-shadow: 0 0 0 3px rgba(20,184,166,.13); outline: none; }
 .form-actions { display: flex; justify-content: flex-end; gap: .7rem; margin-top: 1.25rem; }
-.empty { display: grid; min-height: 215px; place-items: center; padding: 2rem; text-align: center; }
+.empty { display: grid; min-height: 172px; place-items: center; padding: 1.35rem; text-align: center; }
 .empty-icon { display: grid; width: 50px; height: 50px; place-items: center; margin: 0 auto .75rem; border-radius: 15px; background: var(--hv-teal-light); color: var(--hv-teal-dark); font-size: 1.45rem; }
 .timeline { display: grid; gap: .8rem; }
 .timeline-item { display: grid; grid-template-columns: 9px 1fr; gap: .7rem; }
