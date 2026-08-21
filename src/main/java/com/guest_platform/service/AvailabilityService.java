@@ -48,6 +48,15 @@ public class AvailabilityService {
         }
     }
 
+    /**
+     * Phase 6 uses a one-day window after checkout as the conservative extension
+     * availability signal. Phase 7 will define actual extension durations.
+     */
+    @Transactional(readOnly = true)
+    public boolean isAvailableForExtension(UUID propertyId, LocalDate checkoutDate, UUID currentBookingId) {
+        return isAvailable(propertyId, checkoutDate, checkoutDate.plusDays(1), currentBookingId);
+    }
+
     private boolean isAvailable(UUID propertyId, LocalDate checkInDate, LocalDate checkOutDate,
             UUID excludedBookingId) {
         boolean conflict = excludedBookingId == null

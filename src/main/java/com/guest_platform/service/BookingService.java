@@ -29,15 +29,17 @@ public class BookingService {
     private final GuestRepository guestRepository;
     private final BookingRepository bookingRepository;
     private final AvailabilityService availabilityService;
+    private final NotificationService notificationService;
 
     public BookingService(HostRepository hostRepository, PropertyRepository propertyRepository,
             GuestRepository guestRepository, BookingRepository bookingRepository,
-            AvailabilityService availabilityService) {
+            AvailabilityService availabilityService, NotificationService notificationService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
         this.guestRepository = guestRepository;
         this.bookingRepository = bookingRepository;
         this.availabilityService = availabilityService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -52,7 +54,9 @@ public class BookingService {
         Booking booking = new Booking(host, property, guest);
         apply(booking, property, guest, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
                 request.currency(), status, request.notes());
-        return BookingResponse.from(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        notificationService.reconcileBooking(savedBooking.getId());
+        return BookingResponse.from(savedBooking);
     }
 
     @Transactional(readOnly = true)
@@ -76,12 +80,15 @@ public class BookingService {
                 request.checkOutDate(), booking.getId());
         apply(booking, property, guest, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
                 request.currency(), request.status(), request.notes());
+        notificationService.reconcileBooking(booking.getId());
         return BookingResponse.from(booking);
     }
 
     @Transactional
     public void cancel(UUID hostId, UUID bookingId) {
-        findOwnedBooking(hostId, bookingId).cancel();
+        Booking booking = findOwnedBooking(hostId, bookingId);
+        booking.cancel();
+        notificationService.cancelPendingForBooking(booking.getId());
     }
 
     private Host findActiveHost(UUID hostId) {
