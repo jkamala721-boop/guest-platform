@@ -1,20 +1,131 @@
 :root {
+
+  /* =========================================================
+     BRAND
+     ========================================================= */
+
   --hv-navy: #0d47a1;
-  --hv-deep-blue: #124b9d;
+  --hv-deep-blue: #0d47a1;
+
+  --hv-blue-hover: #0a3b87;
+  --hv-blue-soft: #eef4fc;
+
   --hv-teal: #14b8a6;
   --hv-teal-dark: #0f8f86;
-  --hv-teal-light: #e8f7f5;
-  --hv-background: #f6f8fa;
+  --hv-teal-soft: #eaf9f7;
+
+
+  /* =========================================================
+     NEUTRALS
+     ========================================================= */
+
+  --hv-background: #ffffff;
+  --hv-page-background: #f7f7f7;
+
   --hv-surface: #ffffff;
-  --hv-text: #1f2937;
-  --hv-text-muted: #65748b;
-  --hv-border: #dce4e8;
+  --hv-surface-subtle: #fafafa;
+
+  --hv-text: #222222;
+  --hv-text-secondary: #484848;
+  --hv-text-muted: #717171;
+  --hv-text-light: #9a9a9a;
+
+  --hv-border: #dddddd;
+  --hv-border-soft: #ebebeb;
+  --hv-border-strong: #c7c7c7;
+
+
+  /* =========================================================
+     STATUS
+     ========================================================= */
+
   --hv-success: #168a5b;
-  --hv-warning: #b7791f;
-  --hv-danger: #c94a4a;
-  --hv-shadow: 0 16px 42px rgba(20, 46, 78, .09);
-  --hv-radius: 18px;
-  --hv-radius-sm: 11px;
+  --hv-success-soft: #edf8f2;
+
+  --hv-warning: #a96713;
+  --hv-warning-soft: #fff7e8;
+
+  --hv-danger: #c13515;
+  --hv-danger-soft: #fff0ed;
+
+
+  /* =========================================================
+     SHADOWS
+     ========================================================= */
+
+  --hv-shadow-xs:
+    0 1px 2px rgba(0, 0, 0, .04);
+
+  --hv-shadow-sm:
+    0 2px 8px rgba(0, 0, 0, .06);
+
+  --hv-shadow:
+    0 6px 20px rgba(0, 0, 0, .07);
+
+  --hv-shadow-lg:
+    0 12px 32px rgba(0, 0, 0, .10);
+
+
+  /* =========================================================
+     RADIUS
+     ========================================================= */
+
+  --hv-radius-xs: 6px;
+  --hv-radius-sm: 8px;
+  --hv-radius: 12px;
+  --hv-radius-lg: 16px;
+  --hv-radius-pill: 999px;
+
+
+  /* =========================================================
+     SPACING
+     ========================================================= */
+
+  --hv-space-1: 4px;
+  --hv-space-2: 8px;
+  --hv-space-3: 12px;
+  --hv-space-4: 16px;
+  --hv-space-5: 20px;
+  --hv-space-6: 24px;
+  --hv-space-8: 32px;
+  --hv-space-10: 40px;
+  --hv-space-12: 48px;
+
+
+  /* =========================================================
+     LAYOUT
+     ========================================================= */
+
   --hv-max-width: 1440px;
-  --hv-sidebar-width: 248px;
+  --hv-sidebar-width: 240px;
+
+
+  /* =========================================================
+     TYPOGRAPHY
+     ========================================================= */
+
+  --hv-font:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+
+  --hv-font-size-xs: .75rem;
+  --hv-font-size-sm: .875rem;
+  --hv-font-size-md: 1rem;
+  --hv-font-size-lg: 1.125rem;
+  --hv-font-size-xl: 1.5rem;
+  --hv-font-size-2xl: 2rem;
+
+
+  /* =========================================================
+     TRANSITIONS
+     ========================================================= */
+
+  --hv-transition:
+    160ms ease;
 }
