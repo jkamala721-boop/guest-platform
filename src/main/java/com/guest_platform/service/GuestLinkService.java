@@ -49,6 +49,11 @@ public class GuestLinkService {
 
     @Transactional
     public PublicGuestLinkResponse resolvePublic(String token) {
+        return PublicGuestLinkResponse.from(resolveUsableGuestLink(token));
+    }
+
+    @Transactional
+    public GuestLink resolveUsableGuestLink(String token) {
         GuestLink guestLink = guestLinkRepository.findByTokenHash(hash(token))
                 .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
         if (!guestLink.isUsableAt(Instant.now())) {
@@ -57,7 +62,7 @@ public class GuestLinkService {
             }
             throw new ResourceNotFoundException("Guest link was not found");
         }
-        return PublicGuestLinkResponse.from(guestLink);
+        return guestLink;
     }
 
     private String newToken() {

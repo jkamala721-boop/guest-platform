@@ -101,6 +101,14 @@ public class Booking {
         status = BookingStatus.CANCELLED;
     }
 
+    public boolean confirmAfterVerifiedPayment() {
+        if (status != BookingStatus.PENDING_PAYMENT) {
+            return false;
+        }
+        status = BookingStatus.CONFIRMED;
+        return true;
+    }
+
     public UUID getId() { return id; }
     public Host getHost() { return host; }
     public Property getProperty() { return property; }

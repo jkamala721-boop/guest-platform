@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.guest_platform.exception.ConflictException;
 import com.guest_platform.exception.InvalidCredentialsException;
 import com.guest_platform.exception.ResourceNotFoundException;
+import com.guest_platform.exception.WebhookAuthenticationException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -36,6 +37,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(InvalidCredentialsException.class)
     ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException exception) {
+        return response(HttpStatus.UNAUTHORIZED, exception.getMessage(), null);
+    }
+
+    @ExceptionHandler(WebhookAuthenticationException.class)
+    ResponseEntity<Map<String, Object>> handleWebhookAuthentication(WebhookAuthenticationException exception) {
         return response(HttpStatus.UNAUTHORIZED, exception.getMessage(), null);
     }
 

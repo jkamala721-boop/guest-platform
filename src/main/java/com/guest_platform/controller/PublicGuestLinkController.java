@@ -6,20 +6,29 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.guest_platform.dto.PublicGuestLinkResponse;
+import com.guest_platform.dto.PublicReceiptResponse;
 import com.guest_platform.service.GuestLinkService;
+import com.guest_platform.service.ReceiptService;
 
 @RestController
 @RequestMapping("/api/public/guest")
 public class PublicGuestLinkController {
 
     private final GuestLinkService guestLinkService;
+    private final ReceiptService receiptService;
 
-    public PublicGuestLinkController(GuestLinkService guestLinkService) {
+    public PublicGuestLinkController(GuestLinkService guestLinkService, ReceiptService receiptService) {
         this.guestLinkService = guestLinkService;
+        this.receiptService = receiptService;
     }
 
     @GetMapping("/{token}")
     public PublicGuestLinkResponse resolve(@PathVariable String token) {
         return guestLinkService.resolvePublic(token);
+    }
+
+    @GetMapping("/{token}/receipt")
+    public PublicReceiptResponse receipt(@PathVariable String token) {
+        return receiptService.getPublic(token);
     }
 }
