@@ -46,6 +46,7 @@ public class BookingService {
     public BookingResponse create(UUID hostId, BookingCreateRequest request) {
         Host host = findActiveHost(hostId);
         Property property = findActiveOwnedProperty(hostId, request.propertyId());
+        property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
         Guest guest = findOwnedGuest(hostId, request.guestId());
         BookingStatus status = request.status() == null ? BookingStatus.PENDING_CONFIRMATION : request.status();
         availabilityService.requireAvailableFor(status, property.getId(), request.checkInDate(), request.checkOutDate(),
@@ -75,6 +76,7 @@ public class BookingService {
     public BookingResponse update(UUID hostId, UUID bookingId, BookingUpdateRequest request) {
         Booking booking = findOwnedBooking(hostId, bookingId);
         Property property = findActiveOwnedProperty(hostId, request.propertyId());
+        property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
         Guest guest = findOwnedGuest(hostId, request.guestId());
         availabilityService.requireAvailableFor(request.status(), property.getId(), request.checkInDate(),
                 request.checkOutDate(), booking.getId());

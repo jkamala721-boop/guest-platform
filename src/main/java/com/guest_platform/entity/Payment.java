@@ -34,6 +34,10 @@ public class Payment {
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_extension_id")
+    private BookingExtension bookingExtension;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PaymentProvider provider;
@@ -80,6 +84,12 @@ public class Payment {
         this.status = PaymentStatus.PROCESSING;
     }
 
+    public Payment(Host host, Booking booking, BookingExtension bookingExtension, PaymentProvider provider,
+            String providerReference, BigDecimal amount, String currency) {
+        this(host, booking, provider, providerReference, amount, currency);
+        this.bookingExtension = bookingExtension;
+    }
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -119,6 +129,7 @@ public class Payment {
     public UUID getId() { return id; }
     public Host getHost() { return host; }
     public Booking getBooking() { return booking; }
+    public BookingExtension getBookingExtension() { return bookingExtension; }
     public PaymentProvider getProvider() { return provider; }
     public String getProviderReference() { return providerReference; }
     public String getProviderEventId() { return providerEventId; }

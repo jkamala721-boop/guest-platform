@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import com.guest_platform.dto.AvailabilityResponse;
+import com.guest_platform.dto.AvailabilityCalendarResponse;
 import com.guest_platform.dto.PropertyResponse;
 import com.guest_platform.dto.PropertyUpsertRequest;
 import com.guest_platform.security.CurrentHost;
@@ -56,11 +57,18 @@ public class PropertyController {
         return propertyService.get(CurrentHost.id(authentication), propertyId);
     }
 
-    @GetMapping("/{propertyId}/availability")
+    @GetMapping(value = "/{propertyId}/availability", params = { "checkIn", "checkOut" })
     public AvailabilityResponse availability(Authentication authentication, @PathVariable UUID propertyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut) {
         return availabilityService.getAvailability(CurrentHost.id(authentication), propertyId, checkIn, checkOut);
+    }
+
+    @GetMapping(value = "/{propertyId}/availability", params = { "from", "to" })
+    public AvailabilityCalendarResponse availabilityCalendar(Authentication authentication, @PathVariable UUID propertyId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return availabilityService.getCalendar(CurrentHost.id(authentication), propertyId, from, to);
     }
 
     @PutMapping("/{propertyId}")

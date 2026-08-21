@@ -50,7 +50,7 @@ public class ReceiptService {
 
     @Transactional(readOnly = true)
     public ReceiptResponse getForBooking(UUID hostId, UUID bookingId) {
-        return ReceiptResponse.from(receiptRepository.findByBookingIdAndHostId(bookingId, hostId)
+        return ReceiptResponse.from(receiptRepository.findFirstByBookingIdAndHostIdOrderByIssuedAtDesc(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Receipt was not found")));
     }
 
@@ -60,7 +60,7 @@ public class ReceiptService {
         if (guestLink.getState() != GuestLinkState.STAY_ACTIVE) {
             throw new ResourceNotFoundException("Receipt was not found");
         }
-        Receipt receipt = receiptRepository.findByBookingIdAndHostId(guestLink.getBooking().getId(),
+        Receipt receipt = receiptRepository.findFirstByBookingIdAndHostIdOrderByIssuedAtDesc(guestLink.getBooking().getId(),
                 guestLink.getBooking().getHost().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Receipt was not found"));
         return PublicReceiptResponse.from(receipt);

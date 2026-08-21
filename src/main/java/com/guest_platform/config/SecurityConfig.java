@@ -42,8 +42,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
-                        .requestMatchers("/api/public/guest/*", "/api/public/guest/*/receipt",
-                                "/api/public/guest/*/registration").permitAll()
+                        .requestMatchers("/api/public/guest/**").permitAll()
                         .requestMatchers("/api/webhooks/mpesa", "/api/webhooks/stripe").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->

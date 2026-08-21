@@ -85,6 +85,12 @@ public class GuestLink {
         }
     }
 
+    public void extendExpiry(Instant newExpiresAt) {
+        if (newExpiresAt.isAfter(expiresAt)) {
+            expiresAt = newExpiresAt;
+        }
+    }
+
     public boolean isUsableAt(Instant now) {
         return (state == GuestLinkState.REGISTRATION_OR_PAYMENT || state == GuestLinkState.STAY_ACTIVE)
                 && revokedAt == null && expiresAt.isAfter(now);

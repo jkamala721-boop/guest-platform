@@ -78,10 +78,26 @@ public class GuestLinkService {
     }
 
     @Transactional
+    public GuestLinkCreateResponse createForNewBooking(Booking booking) {
+        String token = newToken();
+        Instant expiresAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
+                .toInstant(ZoneOffset.UTC);
+        GuestLink guestLink = guestLinkRepository.save(new GuestLink(booking, hash(token), expiresAt));
+        return new GuestLinkCreateResponse(token, guestLink.getState(), guestLink.getExpiresAt());
+    }
+
+    @Transactional
+    public void synchronizeExpiryForBooking(Booking booking) {
+        Instant expiresAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
+                .toInstant(ZoneOffset.UTC);
+        guestLinkRepository.findAllByBookingId(booking.getId()).forEach(link -> link.extendExpiry(expiresAt));
+    }
+
+    @Transactional
     public PublicGuestLinkResponse resolvePublic(String token) {
         GuestLink guestLink = resolveUsableGuestLink(token);
         if (guestLink.getState() == GuestLinkState.STAY_ACTIVE) {
-            Receipt receipt = receiptRepository.findByBookingId(guestLink.getBooking().getId())
+            Receipt receipt = receiptRepository.findFirstByBookingIdOrderByIssuedAtDesc(guestLink.getBooking().getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
             return PublicGuestStayResponse.from(guestLink, receipt);
         }

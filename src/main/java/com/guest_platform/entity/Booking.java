@@ -109,6 +109,14 @@ public class Booking {
         return true;
     }
 
+    public void extendTo(LocalDate newCheckOutDate, BigDecimal resultingTotalAmount) {
+        if (!newCheckOutDate.isAfter(checkOutDate)) {
+            throw new IllegalArgumentException("newCheckOutDate must be after the current checkOutDate");
+        }
+        checkOutDate = newCheckOutDate;
+        totalAmount = resultingTotalAmount;
+    }
+
     public UUID getId() { return id; }
     public Host getHost() { return host; }
     public Property getProperty() { return property; }
