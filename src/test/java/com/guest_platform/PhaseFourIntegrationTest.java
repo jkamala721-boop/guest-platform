@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
@@ -98,9 +100,13 @@ class PhaseFourIntegrationTest {
         String ownerToken = register("phase4-stripe-owner@example.com", "Stripe Owner");
         String propertyId = createProperty(ownerToken, "Stripe Property");
         String guestId = createGuest(ownerToken, "Stripe Guest");
-        String bookingId = createBooking(ownerToken, propertyId, guestId, LocalDate.now().plusDays(80),
+        String bookingId = createBooking(ownerToken, propertyId, null, LocalDate.now().plusDays(80),
                 LocalDate.now().plusDays(82), "PENDING_PAYMENT", new BigDecimal("450.00"));
         String guestToken = createGuestLink(ownerToken, bookingId);
+        mockMvc.perform(put("/api/public/guest/{token}/registration", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Stripe Guest\",\"phone\":\"+254722333444\",\"email\":\"stripe.guest@example.com\"}"))
+                .andExpect(status().isNoContent());
         String paymentId = initiate(ownerToken, bookingId, "STRIPE");
         String providerReference = payment(ownerToken, paymentId).get("providerReference").asText();
         String payload = webhookPayload(providerReference, "stripe-event-001", true, null);
@@ -126,6 +132,20 @@ class PhaseFourIntegrationTest {
         String receiptId = json(receiptResult).get("id").asText();
         String receiptNumber = json(receiptResult).get("receiptNumber").asText();
 
+        mockMvc.perform(get("/api/bookings/{bookingId}/receipt/document", bookingId)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Hostvero")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Stripe Property")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Stripe Guest")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(receiptNumber)));
+        mockMvc.perform(get("/api/bookings/{bookingId}/receipt/document", bookingId)
+                        .queryParam("download", "true").header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment;")));
+
         mockMvc.perform(post("/api/webhooks/stripe")
                         .header("Stripe-Signature", stripeSignature(payload))
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
@@ -141,11 +161,20 @@ class PhaseFourIntegrationTest {
         String otherToken = register("phase4-stripe-other@example.com", "Receipt Other Host");
         mockMvc.perform(get("/api/receipts/{receiptId}", receiptId).header("Authorization", bearer(otherToken)))
                 .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/bookings/{bookingId}/receipt/document", bookingId)
+                        .header("Authorization", bearer(otherToken)))
+                .andExpect(status().isNotFound());
         mockMvc.perform(post("/api/bookings/{bookingId}/guest-link", bookingId)
                         .header("Authorization", bearer(ownerToken)))
                 .andExpect(status().isConflict());
         mockMvc.perform(get("/api/public/guest/{token}/receipt", guestToken)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/public/guest/{token}/receipt/document", guestToken))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(receiptNumber)));
         mockMvc.perform(get("/api/public/guest/{token}/receipt", "not-a-valid-token")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/public/guest/{token}/receipt/document", "not-a-valid-token"))
+                .andExpect(status().isNotFound());
 
         String secondBookingId = createBooking(ownerToken, propertyId, guestId, LocalDate.now().plusDays(85),
                 LocalDate.now().plusDays(87), "PENDING_PAYMENT", new BigDecimal("451.00"));

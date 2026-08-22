@@ -106,7 +106,7 @@ public class Payment {
     }
 
     public boolean markSucceeded(String eventId) {
-        if (status == PaymentStatus.SUCCEEDED || status == PaymentStatus.CANCELLED) {
+        if (status != PaymentStatus.PROCESSING && status != PaymentStatus.PENDING) {
             return false;
         }
         status = PaymentStatus.SUCCEEDED;
@@ -117,13 +117,33 @@ public class Payment {
     }
 
     public boolean markFailed(String eventId, String reason) {
-        if (status == PaymentStatus.SUCCEEDED || status == PaymentStatus.CANCELLED) {
+        if (status != PaymentStatus.PROCESSING && status != PaymentStatus.PENDING) {
             return false;
         }
         status = PaymentStatus.FAILED;
         providerEventId = eventId;
         failureReason = reason;
         return true;
+    }
+
+    public boolean markCancelled(String eventId, String reason) {
+        if (status != PaymentStatus.PROCESSING && status != PaymentStatus.PENDING) {
+            return false;
+        }
+        status = PaymentStatus.CANCELLED;
+        providerEventId = eventId;
+        failureReason = reason;
+        return true;
+    }
+
+    public void setProviderReference(String providerReference) {
+        if (providerReference == null || providerReference.isBlank() || providerReference.length() > 200) {
+            throw new IllegalArgumentException("providerReference is required");
+        }
+        if (status != PaymentStatus.PROCESSING) {
+            throw new IllegalStateException("Payment provider reference cannot be changed after processing");
+        }
+        this.providerReference = providerReference;
     }
 
     public UUID getId() { return id; }

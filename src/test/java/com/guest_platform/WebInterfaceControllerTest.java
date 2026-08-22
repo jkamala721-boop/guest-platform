@@ -40,7 +40,9 @@ class WebInterfaceControllerTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/js/app.js"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("tokenHash"))));
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("tokenHash"))))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Refresh this page in a few moments")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("receipt/document")));
         mvc.perform(get("/js/api.js"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("sessionStorage")))

@@ -1408,6 +1408,9 @@ async function renderBookingDetail(id) {
     const guestLinkUrl = sessionStorage.getItem(
       `hostvero.guest-link.${booking.id}`
     );
+    const receiptGuestUrl = guestLinkUrl
+      ? `${guestLinkUrl.replace(/\/$/, '')}/receipt/document`
+      : null;
 
     const [payments, notifications, receipt] = await Promise.all([
       get(`/api/bookings/${id}/payments`),
@@ -1745,6 +1748,15 @@ async function renderBookingDetail(id) {
                     </div>
 
                   </div>
+
+                  <div class="booking-detail-actions">
+                    <button class="button secondary" data-view-receipt type="button">View receipt</button>
+                    <button class="button secondary" data-download-receipt type="button">Download receipt</button>
+                    ${receiptGuestUrl ? `
+                      <button class="button secondary" data-copy-receipt-link type="button">Copy receipt link</button>
+                      <a class="button secondary" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Your Hostvero receipt: ${receiptGuestUrl}`)}">Send via WhatsApp</a>
+                    ` : ''}
+                  </div>
                 `
                 : ''
             }
@@ -1868,6 +1880,23 @@ async function renderBookingDetail(id) {
           )
       );
 
+    $('[data-view-receipt]')?.addEventListener('click', () => {
+      openHostReceiptDocument(id, false).catch(error => toast(error.message, 'error'));
+    });
+
+    $('[data-download-receipt]')?.addEventListener('click', () => {
+      openHostReceiptDocument(id, true).catch(error => toast(error.message, 'error'));
+    });
+
+    $('[data-copy-receipt-link]')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(receiptGuestUrl);
+        toast('Receipt link copied.', 'success');
+      } catch {
+        toast('Your browser could not copy the receipt link.', 'error');
+      }
+    });
+
 
     $('[data-extend]').addEventListener(
       'click',
@@ -1901,6 +1930,32 @@ async function renderBookingDetail(id) {
 }
 
 async function createGuestLink(bookingId) { try { const link = await post(`/api/bookings/${bookingId}/guest-link`, {}); const url = `${location.origin}/guest/${link.token}`; sessionStorage.setItem(`hostvero.guest-link.${bookingId}`, url); const modal = openModal({ title: 'Guest link created', body: `<p class="notice">Copy this link now. For security, Hostvero never retrieves it from a token hash later.</p><div class="field" style="margin-top:1rem"><label for="guest-link-value">Secure guest link</label><input id="guest-link-value" readonly value="${escapeHtml(url)}"></div>`, actions: `<button class="button" type="button" data-copy-link>Copy link</button><a class="button secondary" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Your Hostvero guest link: ${url}`)}">Send via WhatsApp</a>` }); $('[data-copy-link]', modal.root).addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Guest link copied.', 'success'); } catch { $('#guest-link-value', modal.root).select(); toast('Select and copy the link.', ''); } }); } catch (error) { toast(error.message, 'error'); } }
+
+async function openHostReceiptDocument(bookingId, download) {
+  const receiptWindow = download ? null : window.open('', '_blank');
+  try {
+    const response = await fetch(`/api/bookings/${bookingId}/receipt/document${download ? '?download=true' : ''}`, {
+      headers: { Authorization: `Bearer ${session.token}` }
+    });
+    if (!response.ok) throw new ApiError(response.status, 'We could not open that receipt.');
+    const documentUrl = URL.createObjectURL(await response.blob());
+    if (download) {
+      const link = document.createElement('a');
+      link.href = documentUrl;
+      link.download = 'hostvero-receipt.html';
+      link.click();
+    } else if (receiptWindow) {
+      receiptWindow.location.href = documentUrl;
+    } else {
+      URL.revokeObjectURL(documentUrl);
+      throw new Error('Please allow pop-ups to view the receipt.');
+    }
+    window.setTimeout(() => URL.revokeObjectURL(documentUrl), 60000);
+  } catch (error) {
+    receiptWindow?.close();
+    throw error;
+  }
+}
 
 function initiatePayment(path, successMessage) { const modal = openModal({ title: 'Initiate payment', body: '<p class="muted">Choose the configured payment provider. Payment success is always verified server-side.</p><div class="field"><label for="payment-provider">Provider</label><select id="payment-provider"><option value="MPESA">M-Pesa</option><option value="STRIPE">Stripe</option></select></div>', actions: '<button class="button" type="button" data-start-payment>Initiate payment</button>' }); $('[data-start-payment]', modal.root).addEventListener('click', async event => { const button = event.currentTarget; setButtonBusy(button, true, 'Starting…'); try { const result = await post(path, { provider: $('#payment-provider', modal.root).value }); modal.close(); openModal({ title: 'Payment initiated', body: `<div class="notice">${escapeHtml(successMessage)}</div><div class="detail-list" style="margin-top:1rem"><div class="detail-row"><span>Amount</span><strong>${formatMoney(result.amount, result.currency)}</strong></div><div class="detail-row"><span>Reference</span><strong>${escapeHtml(result.providerReference)}</strong></div><div class="detail-row"><span>Status</span>${badge(result.status)}</div></div>` }); } catch (error) { toast(error.message, 'error'); setButtonBusy(button, false); } }); }
 
@@ -4904,7 +4959,7 @@ function renderPaymentStay(result) {
     <section class="public-section">
       <header class="public-section-header">
         <h2>${paymentPending ? 'Complete payment' : 'Payment in progress'}</h2>
-        <p>${paymentPending ? 'Choose a payment provider to start the secure payment process.' : 'Hostvero will unlock your stay after the provider verifies payment.'}</p>
+        <p>${paymentPending ? 'Choose a payment provider to start the secure payment process.' : 'Hostvero will unlock your stay after the payment provider verifies your payment. Refresh this page in a few moments to see your confirmed stay and check-in details.'}</p>
       </header>
       ${paymentPending ? `
         <form id="public-payment" class="public-registration-form">
@@ -4914,7 +4969,7 @@ function renderPaymentStay(result) {
           </div>
           <div class="public-form-actions"><button class="button" type="submit">Continue to payment</button></div>
         </form>
-      ` : '<div class="public-form-note">Do not close this page. Refresh after your provider confirms payment.</div>'}
+      ` : '<div class="public-form-note">Refresh this page in a few moments after your provider confirms payment.</div>'}
     </section>
   `;
 }
@@ -5011,6 +5066,17 @@ function renderActiveStay(result, token) {
               Open directions
             </a>
 
+          </div>
+        `
+        : ''
+    }
+
+    ${
+      result.receipt
+        ? `
+          <div class="public-primary-action">
+            <a class="button secondary" target="_blank" rel="noopener noreferrer" href="/api/public/guest/${encodeURIComponent(token)}/receipt/document">View receipt</a>
+            <a class="button secondary" href="/api/public/guest/${encodeURIComponent(token)}/receipt/document?download=true">Download receipt</a>
           </div>
         `
         : ''
@@ -5158,7 +5224,8 @@ function renderActiveStay(result, token) {
     </section>
   `;
 }
-function bindPublicForms() { const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || ''); $('#public-registration')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { await put(`/api/public/guest/${encodeURIComponent(token)}/registration`, Object.fromEntries(new FormData(event.currentTarget))); await renderPublicGuest(); bindPublicForms(); toast('Your details have been saved. Continue to payment.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-payment')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true, 'Starting…'); try { const payment = await post(`/api/public/guest/${encodeURIComponent(token)}/payments`, Object.fromEntries(new FormData(event.currentTarget))); await renderPublicGuest(); bindPublicForms(); toast(payment.nextAction || 'Payment initiated. Await provider verification.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-extend')?.addEventListener('click', () => publicStayAction(token, 'extend')); $('#public-book-again')?.addEventListener('click', () => publicStayAction(token, 'again')); }
+function bindPublicForms() { const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || ''); $('#public-registration')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { await put(`/api/public/guest/${encodeURIComponent(token)}/registration`, Object.fromEntries(new FormData(event.currentTarget))); await renderPublicGuest(); bindPublicForms(); toast('Your details have been saved. Continue to payment.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-payment')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true, 'Starting…'); try { const payment = await post(`/api/public/guest/${encodeURIComponent(token)}/payments`, Object.fromEntries(new FormData(event.currentTarget))); if (payment.provider === 'STRIPE' && isStripeCheckoutUrl(payment.nextAction)) { window.location.assign(payment.nextAction); return; } await renderPublicGuest(); bindPublicForms(); toast(payment.nextAction || 'Payment initiated. Await provider verification.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-extend')?.addEventListener('click', () => publicStayAction(token, 'extend')); $('#public-book-again')?.addEventListener('click', () => publicStayAction(token, 'again')); }
+function isStripeCheckoutUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'checkout.stripe.com'; } catch { return false; } }
 
 function publicStayAction(token, type) { const extend = type === 'extend'; const modal = openModal({ title: extend ? 'Extend your stay' : 'Book again', body: `<p class="muted">Hostvero will check availability before creating your request.</p><form id="public-stay-form">${extend ? '<div class="field"><label>New checkout date</label><input name="newCheckOutDate" type="date" required></div>' : '<div class="form-grid"><div class="field"><label>Check-in date</label><input name="checkInDate" type="date" required></div><div class="field"><label>Check-out date</label><input name="checkOutDate" type="date" required></div></div>'}<div class="form-actions"><button class="button" type="submit">Check availability</button></div></form>` }); $('#public-stay-form', modal.root).addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { const result = await post(`/api/public/guest/${encodeURIComponent(token)}/${extend ? 'extend' : 'book-again'}`, Object.fromEntries(new FormData(event.currentTarget))); modal.close(); toast(extend && result.status === 'PENDING_PAYMENT' ? 'Extension payment is required before your checkout changes.' : extend ? 'Your stay request was confirmed.' : 'Your future booking was created.', 'success'); renderPublicGuest(); } catch (error) { toast(error.status === 409 ? 'Those dates are no longer available.' : error.message, 'error'); setButtonBusy(button, false); } }); }
 

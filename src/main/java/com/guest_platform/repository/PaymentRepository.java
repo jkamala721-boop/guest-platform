@@ -26,6 +26,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     boolean existsByBookingIdAndStatus(UUID bookingId, PaymentStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select payment from Payment payment where payment.id = :id")
+    Optional<Payment> findForUpdateById(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select payment from Payment payment where payment.provider = :provider "
             + "and payment.providerReference = :providerReference")
     Optional<Payment> findForUpdateByProviderAndProviderReference(@Param("provider") PaymentProvider provider,

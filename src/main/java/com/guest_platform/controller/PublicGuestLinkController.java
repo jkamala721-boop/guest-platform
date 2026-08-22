@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.guest_platform.dto.PublicGuestLinkResponse;
 import com.guest_platform.dto.PublicGuestRegistrationRequest;
 import com.guest_platform.dto.PublicReceiptResponse;
+import com.guest_platform.dto.ReceiptDocument;
 import com.guest_platform.dto.ExtendStayRequest;
 import com.guest_platform.dto.BookAgainRequest;
 import com.guest_platform.dto.BookAgainResponse;
@@ -62,12 +63,22 @@ public class PublicGuestLinkController {
     public org.springframework.http.ResponseEntity<PaymentInitiationResponse> initiatePayment(@PathVariable String token,
             @Valid @RequestBody PaymentInitiateRequest request) {
         return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
-                .body(paymentService.initiateForGuestLink(guestLinkService.resolveUsableGuestLink(token), request));
+                .body(paymentService.initiateForGuestLink(guestLinkService.resolveUsableGuestLink(token), token, request));
     }
 
     @GetMapping("/{token}/receipt")
     public PublicReceiptResponse receipt(@PathVariable String token) {
         return receiptService.getPublic(token);
+    }
+
+    @GetMapping(value = "/{token}/receipt/document", produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
+    public org.springframework.http.ResponseEntity<String> receiptDocument(@PathVariable String token,
+            @RequestParam(defaultValue = "false") boolean download) {
+        ReceiptDocument receipt = receiptService.publicDocument(token);
+        String disposition = (download ? "attachment" : "inline") + "; filename=\"" + receipt.filename() + "\"";
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, disposition)
+                .contentType(org.springframework.http.MediaType.TEXT_HTML).body(receipt.html());
     }
 
     @PostMapping("/{token}/extend")

@@ -24,12 +24,12 @@ public class MpesaPaymentProvider implements PaymentProviderAdapter {
     }
 
     @Override
-    public PaymentInitiation initiate(BigDecimal amount, String currency) {
+    public PaymentInitiation initiate(PaymentInitiationRequest request) {
         if (!"mock".equalsIgnoreCase(mode)) {
             throw new IllegalStateException("M-Pesa live initiation is not configured");
         }
         return new PaymentInitiation("MPESA-MOCK-" + UUID.randomUUID(),
-                "Complete the M-Pesa prompt for " + amount.toPlainString() + " "
-                        + currency.toUpperCase(Locale.ROOT));
+                "Complete the M-Pesa prompt for " + request.amount().toPlainString() + " "
+                        + request.currency().toUpperCase(Locale.ROOT));
     }
 }

@@ -11,6 +11,7 @@ import com.guest_platform.dto.PaymentWebhookRequest;
 import com.guest_platform.entity.PaymentProvider;
 import com.guest_platform.service.PaymentService;
 import com.guest_platform.service.PaymentWebhookVerifier;
+import com.guest_platform.service.StripeWebhookService;
 
 @RestController
 @RequestMapping("/api/webhooks")
@@ -18,10 +19,13 @@ public class PaymentWebhookController {
 
     private final PaymentWebhookVerifier paymentWebhookVerifier;
     private final PaymentService paymentService;
+    private final StripeWebhookService stripeWebhookService;
 
-    public PaymentWebhookController(PaymentWebhookVerifier paymentWebhookVerifier, PaymentService paymentService) {
+    public PaymentWebhookController(PaymentWebhookVerifier paymentWebhookVerifier, PaymentService paymentService,
+            StripeWebhookService stripeWebhookService) {
         this.paymentWebhookVerifier = paymentWebhookVerifier;
         this.paymentService = paymentService;
+        this.stripeWebhookService = stripeWebhookService;
     }
 
     @PostMapping("/mpesa")
@@ -35,8 +39,7 @@ public class PaymentWebhookController {
     @PostMapping("/stripe")
     public ResponseEntity<Void> stripe(@RequestHeader(value = "Stripe-Signature", required = false) String signature,
             @RequestBody String payload) {
-        PaymentWebhookRequest request = paymentWebhookVerifier.verifyStripe(signature, payload);
-        paymentService.processVerifiedWebhook(PaymentProvider.STRIPE, request);
+        stripeWebhookService.process(signature, payload);
         return ResponseEntity.noContent().build();
     }
 }

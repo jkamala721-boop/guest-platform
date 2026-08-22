@@ -35,3 +35,24 @@ Run the Phase 0 checks with:
 ```powershell
 .\mvnw.cmd test
 ```
+
+## Stripe Checkout sandbox
+
+Stripe remains in safe mock mode by default. To test Stripe Checkout manually, set these values only in an ignored
+`.env` file or your deployment secret store:
+
+```properties
+STRIPE_PAYMENT_MODE=live
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+HOSTVERO_PUBLIC_BASE_URL=http://localhost:8080
+```
+
+Start the application, then forward Stripe test events to the public webhook endpoint with:
+
+```powershell
+stripe listen --forward-to http://localhost:8080/api/webhooks/stripe
+```
+
+Copy the `whsec_...` value printed by Stripe CLI into `STRIPE_WEBHOOK_SECRET`. A Checkout return URL never confirms a
+booking; only Stripe's signature-verified webhook does.

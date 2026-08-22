@@ -184,6 +184,34 @@ class PhaseFiveIntegrationTest {
     }
 
     @Test
+    void publicStripeInitiationRequiresRegistrationUsesBookingAmountAndRejectsUnknownLinks() throws Exception {
+        String hostToken = register("phase5-public-stripe@example.com", "Public Stripe Host");
+        String propertyId = createProperty(hostToken, "Public Stripe Property");
+        String bookingId = createBooking(hostToken, propertyId, null, LocalDate.now().plusDays(145),
+                LocalDate.now().plusDays(147), "PENDING_PAYMENT");
+        String guestToken = createGuestLink(hostToken, bookingId);
+
+        mockMvc.perform(post("/api/public/guest/{token}/payments", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"STRIPE\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/public/guest/{token}/payments", "unknown-link")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"STRIPE\"}"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(put("/api/public/guest/{token}/registration", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Stripe Public Guest\",\"phone\":\"+254733444556\",\"email\":\"stripe.public.guest@example.com\"}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/public/guest/{token}/payments", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"STRIPE\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.provider").value("STRIPE"))
+                .andExpect(jsonPath("$.amount").value(450.00))
+                .andExpect(jsonPath("$.currency").value("KES"))
+                .andExpect(jsonPath("$.status").value("PROCESSING"));
+    }
+
+    @Test
     void expiredAndRevokedGuestLinksNeverExposePublicStayData() throws Exception {
         String hostToken = register("phase5-expired@example.com", "Expiry Host");
         String propertyId = createProperty(hostToken, "Expiry Property");
