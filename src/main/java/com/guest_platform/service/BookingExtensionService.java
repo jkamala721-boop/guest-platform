@@ -72,10 +72,36 @@ public class BookingExtensionService {
     private BookAgainResponse bookAgain(Booking source, BookAgainRequest request) {
         propertyRepository.findForUpdateById(source.getProperty().getId()).orElseThrow(()->new ResourceNotFoundException("Property was not found"));
         availabilityService.requireAvailableFor(BookingStatus.PENDING_PAYMENT, source.getProperty().getId(), request.checkInDate(), request.checkOutDate(), null);
-        Booking repeat=new Booking(source.getHost(),source.getProperty(),source.getGuest());
-        BigDecimal amount=source.getProperty().getDefaultNightlyRate().multiply(BigDecimal.valueOf(java.time.temporal.ChronoUnit.DAYS.between(request.checkInDate(),request.checkOutDate())));
-        repeat.update(source.getProperty(),source.getGuest(),request.checkInDate(),request.checkOutDate(),amount,source.getProperty().getCurrency(),BookingStatus.PENDING_PAYMENT,null);
-        bookingRepository.save(repeat); notificationService.reconcileBooking(repeat.getId());
+       Booking repeat = new Booking(
+                source.getHost(),
+                source.getProperty()
+       );
+
+       if (source.getGuest() != null) {
+            repeat.assignGuest(source.getGuest());
+       }
+
+       BigDecimal amount = source.getProperty()
+               .getDefaultNightlyRate()
+               .multiply(
+                        BigDecimal.valueOf(
+                                java.time.temporal.ChronoUnit.DAYS.between(
+                                        request.checkInDate(),
+                                        request.checkOutDate()
+                                )
+                        )
+                );
+
+        repeat.update(
+                source.getProperty(),
+                request.checkInDate(),
+                request.checkOutDate(),
+                amount,
+                source.getProperty().getCurrency(),
+                BookingStatus.PENDING_PAYMENT,
+                null
+        );
+         bookingRepository.save(repeat); notificationService.reconcileBooking(repeat.getId());
         return new BookAgainResponse(BookingResponse.from(repeat),guestLinkService.createForNewBooking(repeat));
     }
     @Transactional

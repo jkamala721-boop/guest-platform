@@ -32,6 +32,7 @@ import com.guest_platform.repository.BookingRepository;
 import com.guest_platform.repository.GuestLinkRepository;
 import com.guest_platform.repository.PaymentRepository;
 import com.guest_platform.repository.ReceiptRepository;
+import com.guest_platform.repository.GuestRepository;
 
 @Service
 public class GuestLinkService {
@@ -42,13 +43,16 @@ public class GuestLinkService {
     private final GuestLinkRepository guestLinkRepository;
     private final PaymentRepository paymentRepository;
     private final ReceiptRepository receiptRepository;
+    private final GuestRepository guestRepository;
 
-    public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
-            PaymentRepository paymentRepository, ReceiptRepository receiptRepository) {
+   public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
+            PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
+            GuestRepository guestRepository) {
         this.bookingRepository = bookingRepository;
         this.guestLinkRepository = guestLinkRepository;
         this.paymentRepository = paymentRepository;
         this.receiptRepository = receiptRepository;
+        this.guestRepository = guestRepository;
     }
 
     @Transactional
@@ -107,16 +111,47 @@ public class GuestLinkService {
         return PublicGuestRegistrationOrPaymentResponse.from(guestLink, status);
     }
 
-    @Transactional
+   @Transactional
     public void updateGuestRegistration(String token, PublicGuestRegistrationRequest request) {
         GuestLink guestLink = resolveUsableGuestLink(token);
+
         if (guestLink.getState() != GuestLinkState.REGISTRATION_OR_PAYMENT) {
             throw new ConflictException("Guest registration is no longer available");
         }
-        Guest guest = guestLink.getBooking().getGuest();
-        guest.update(request.fullName().trim(), request.phone().trim(), request.email().trim().toLowerCase(Locale.ROOT),
-                normalizeOptional(request.idType()), normalizeOptional(request.idNumber()),
-                normalizeOptional(request.nationality()), normalizeOptional(request.whatsappNumber()), guest.getNotes());
+
+        Booking booking = guestLink.getBooking();
+        Guest guest = booking.getGuest();
+
+        if (guest == null) {
+            guest = new Guest(booking.getHost());
+
+            guest.update(
+                    request.fullName().trim(),
+                    request.phone().trim(),
+                    request.email().trim().toLowerCase(Locale.ROOT),
+                    normalizeOptional(request.idType()),
+                    normalizeOptional(request.idNumber()),
+                    normalizeOptional(request.nationality()),
+                    normalizeOptional(request.whatsappNumber()),
+                    null
+            );
+
+            guest = guestRepository.save(guest);
+
+            booking.assignGuest(guest);
+
+        } else {
+            guest.update(
+                    request.fullName().trim(),
+                    request.phone().trim(),
+                    request.email().trim().toLowerCase(Locale.ROOT),
+                    normalizeOptional(request.idType()),
+                    normalizeOptional(request.idNumber()),
+                    normalizeOptional(request.nationality()),
+                    normalizeOptional(request.whatsappNumber()),
+                    guest.getNotes()
+            );
+        }
     }
 
     @Transactional

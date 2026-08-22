@@ -12,12 +12,10 @@ import com.guest_platform.dto.BookingResponse;
 import com.guest_platform.dto.BookingUpdateRequest;
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
-import com.guest_platform.entity.Guest;
 import com.guest_platform.entity.Host;
 import com.guest_platform.entity.Property;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.BookingRepository;
-import com.guest_platform.repository.GuestRepository;
 import com.guest_platform.repository.HostRepository;
 import com.guest_platform.repository.PropertyRepository;
 
@@ -26,17 +24,15 @@ public class BookingService {
 
     private final HostRepository hostRepository;
     private final PropertyRepository propertyRepository;
-    private final GuestRepository guestRepository;
     private final BookingRepository bookingRepository;
     private final AvailabilityService availabilityService;
     private final NotificationService notificationService;
 
     public BookingService(HostRepository hostRepository, PropertyRepository propertyRepository,
-            GuestRepository guestRepository, BookingRepository bookingRepository,
+            BookingRepository bookingRepository,
             AvailabilityService availabilityService, NotificationService notificationService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
-        this.guestRepository = guestRepository;
         this.bookingRepository = bookingRepository;
         this.availabilityService = availabilityService;
         this.notificationService = notificationService;
@@ -45,18 +41,48 @@ public class BookingService {
     @Transactional
     public BookingResponse create(UUID hostId, BookingCreateRequest request) {
         Host host = findActiveHost(hostId);
-        Property property = findActiveOwnedProperty(hostId, request.propertyId());
-        property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
-        Guest guest = findOwnedGuest(hostId, request.guestId());
-        BookingStatus status = request.status() == null ? BookingStatus.PENDING_CONFIRMATION : request.status();
-        availabilityService.requireAvailableFor(status, property.getId(), request.checkInDate(), request.checkOutDate(),
-                null);
 
-        Booking booking = new Booking(host, property, guest);
-        apply(booking, property, guest, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
-                request.currency(), status, request.notes());
+        Property property = findActiveOwnedProperty(
+                hostId,
+                request.propertyId()
+        );
+
+        property = propertyRepository.findForUpdateById(property.getId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Property was not found")
+                );
+
+        BookingStatus status = request.status() == null
+                ? BookingStatus.PENDING_CONFIRMATION
+                : request.status();
+
+        availabilityService.requireAvailableFor(
+                status,
+                property.getId(),
+                request.checkInDate(),
+                request.checkOutDate(),
+                null
+        );
+
+        Booking booking = new Booking(host, property);
+
+        apply(
+                booking,
+                property,
+                request.checkInDate(),
+                request.checkOutDate(),
+                request.totalAmount(),
+                request.currency(),
+                status,
+                request.notes()
+        );
+
         Booking savedBooking = bookingRepository.save(booking);
-        notificationService.reconcileBooking(savedBooking.getId());
+
+        notificationService.reconcileBooking(
+                savedBooking.getId()
+        );
+
         return BookingResponse.from(savedBooking);
     }
 
@@ -77,10 +103,9 @@ public class BookingService {
         Booking booking = findOwnedBooking(hostId, bookingId);
         Property property = findActiveOwnedProperty(hostId, request.propertyId());
         property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
-        Guest guest = findOwnedGuest(hostId, request.guestId());
         availabilityService.requireAvailableFor(request.status(), property.getId(), request.checkInDate(),
                 request.checkOutDate(), booking.getId());
-        apply(booking, property, guest, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
+        apply(booking, property, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
                 request.currency(), request.status(), request.notes());
         notificationService.reconcileBooking(booking.getId());
         return BookingResponse.from(booking);
@@ -105,20 +130,15 @@ public class BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
     }
 
-    private Guest findOwnedGuest(UUID hostId, UUID guestId) {
-        return guestRepository.findByIdAndHostId(guestId, hostId)
-                .orElseThrow(() -> new ResourceNotFoundException("Guest was not found"));
-    }
-
     private Booking findOwnedBooking(UUID hostId, UUID bookingId) {
         return bookingRepository.findByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
     }
 
-    private void apply(Booking booking, Property property, Guest guest, java.time.LocalDate checkInDate,
+    private void apply(Booking booking, Property property, java.time.LocalDate checkInDate,
             java.time.LocalDate checkOutDate, java.math.BigDecimal totalAmount, String currency,
             BookingStatus status, String notes) {
-        booking.update(property, guest, checkInDate, checkOutDate, totalAmount,
+        booking.update(property, checkInDate, checkOutDate, totalAmount,
                 currency.toUpperCase(Locale.ROOT), status, normalizeOptional(notes));
     }
 

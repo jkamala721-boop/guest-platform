@@ -785,21 +785,12 @@ async function renderBookingForm(existing = null) {
 
   bindShell();
 
-
   try {
-
     const {
-      properties,
-      guests
+      properties
     } = await hydrateBasics();
 
-
-    /* -----------------------------------------------------
-       PROPERTY REQUIREMENT
-       ----------------------------------------------------- */
-
     if (!properties.length) {
-
       app.innerHTML = hostShell(
         'bookings',
         `
@@ -823,48 +814,8 @@ async function renderBookingForm(existing = null) {
       );
 
       bindShell();
-
       return;
     }
-
-
-    /*
-     * Temporary Phase 8 limitation:
-     * the current backend booking model still requires guestId.
-     *
-     * Later backend work will allow the host to create the booking
-     * first and the guest to register through the secure guest link.
-     */
-
-    if (!guests.length) {
-
-      app.innerHTML = hostShell(
-        'bookings',
-        `
-          ${heading(
-            'New booking',
-            'Booking creation will move to the new guest-link flow.',
-            '<a class="button secondary" href="#/bookings">← Bookings</a>'
-          )}
-
-          <section class="card card-pad">
-
-            ${emptyState(
-              '⌁',
-              'Guest-link booking flow is next',
-              'The current backend still requires an existing guest record. We will remove this requirement when we update the booking model.',
-              '<a class="button secondary" href="#/bookings">Back to bookings</a>'
-            )}
-
-          </section>
-        `
-      );
-
-      bindShell();
-
-      return;
-    }
-
 
     const value = (
       key,
@@ -873,7 +824,6 @@ async function renderBookingForm(existing = null) {
       escapeHtml(
         existing?.[key] ?? fallback
       );
-
 
     const propertyOptions =
       properties
@@ -903,28 +853,6 @@ async function renderBookingForm(existing = null) {
         )
         .join('');
 
-
-    const guestOptions =
-      guests
-        .map(
-          guest => `
-            <option
-              value="${guest.id}"
-              ${
-                guest.id === existing?.guestId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${escapeHtml(guest.fullName)}
-              ·
-              ${escapeHtml(guest.phone)}
-            </option>
-          `
-        )
-        .join('');
-
-
     const statusOptions = [
       'PENDING_PAYMENT',
       'PENDING_CONFIRMATION',
@@ -941,7 +869,7 @@ async function renderBookingForm(existing = null) {
               status ===
               (
                 existing?.status ||
-                'PENDING_PAYMENT'
+                'PENDING_CONFIRMATION'
               )
                 ? 'selected'
                 : ''
@@ -953,13 +881,11 @@ async function renderBookingForm(existing = null) {
       )
       .join('');
 
-
     const form = `
       <form
         id="booking-form"
         class="booking-form"
       >
-
 
         <section class="booking-form-section">
 
@@ -967,13 +893,11 @@ async function renderBookingForm(existing = null) {
             <h2>Stay</h2>
 
             <p>
-              Choose where and when the guest will stay.
+              Choose the property and stay dates.
             </p>
           </header>
 
-
           <div class="form-grid">
-
 
             <div class="field full">
 
@@ -990,7 +914,6 @@ async function renderBookingForm(existing = null) {
               </select>
 
             </div>
-
 
             <div class="field">
 
@@ -1010,7 +933,6 @@ async function renderBookingForm(existing = null) {
 
             </div>
 
-
             <div class="field">
 
               <label for="booking-checkout">
@@ -1028,7 +950,6 @@ async function renderBookingForm(existing = null) {
               >
 
             </div>
-
 
             <div class="field full">
 
@@ -1049,7 +970,6 @@ async function renderBookingForm(existing = null) {
 
         </section>
 
-
         <section class="booking-form-section">
 
           <header class="booking-form-section-header">
@@ -1060,9 +980,7 @@ async function renderBookingForm(existing = null) {
             </p>
           </header>
 
-
           <div class="form-grid">
-
 
             <div class="field">
 
@@ -1084,7 +1002,6 @@ async function renderBookingForm(existing = null) {
               >
 
             </div>
-
 
             <div class="field">
 
@@ -1109,53 +1026,44 @@ async function renderBookingForm(existing = null) {
 
         </section>
 
-
         <section class="booking-form-section">
 
           <header class="booking-form-section-header">
-            <h2>Guest & status</h2>
+            <h2>Booking details</h2>
 
             <p>
-              Temporary fields required by the current booking model.
+              The guest will provide their personal information through the secure guest link.
             </p>
           </header>
 
-
           <div class="form-grid">
 
+            ${
+              existing
+                ? `
+                  <div class="field">
 
-            <div class="field">
+                    <label for="booking-status">
+                      Status
+                    </label>
 
-              <label for="booking-guest">
-                Guest
-              </label>
+                    <select
+                      id="booking-status"
+                      name="status"
+                    >
+                      ${statusOptions}
+                    </select>
 
-              <select
-                id="booking-guest"
-                name="guestId"
-                required
-              >
-                ${guestOptions}
-              </select>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="booking-status">
-                Status
-              </label>
-
-              <select
-                id="booking-status"
-                name="status"
-              >
-                ${statusOptions}
-              </select>
-
-            </div>
-
+                  </div>
+                `
+                : `
+                  <input
+                    type="hidden"
+                    name="status"
+                    value="PENDING_CONFIRMATION"
+                  >
+                `
+            }
 
             <div class="field full">
 
@@ -1179,7 +1087,6 @@ async function renderBookingForm(existing = null) {
 
         </section>
 
-
         <div class="form-actions">
 
           <a
@@ -1202,10 +1109,8 @@ async function renderBookingForm(existing = null) {
 
         </div>
 
-
       </form>
     `;
-
 
     app.innerHTML = hostShell(
       'bookings',
@@ -1226,13 +1131,7 @@ async function renderBookingForm(existing = null) {
 
     bindShell();
 
-
-    /* -----------------------------------------------------
-       AUTOMATIC AMOUNT
-       ----------------------------------------------------- */
-
     const updateAmount = () => {
-
       const property =
         properties.find(
           item =>
@@ -1246,14 +1145,12 @@ async function renderBookingForm(existing = null) {
       const checkOut =
         $('#booking-checkout').value;
 
-
       if (
         property &&
         checkIn &&
         checkOut &&
         !existing
       ) {
-
         const nights =
           Math.max(
             0,
@@ -1266,9 +1163,7 @@ async function renderBookingForm(existing = null) {
             )
           );
 
-
         if (nights) {
-
           $('#booking-total').value =
             (
               Number(
@@ -1279,20 +1174,11 @@ async function renderBookingForm(existing = null) {
 
           $('#booking-currency').value =
             property.currency;
-
         }
-
       }
-
     };
 
-
-    /* -----------------------------------------------------
-       AVAILABILITY
-       ----------------------------------------------------- */
-
     const checkAvailability = async () => {
-
       const propertyId =
         $('#booking-property').value;
 
@@ -1305,13 +1191,11 @@ async function renderBookingForm(existing = null) {
       const feedback =
         $('#booking-availability');
 
-
       if (
         !propertyId ||
         !checkIn ||
         !checkOut
       ) {
-
         feedback.className =
           'date-feedback';
 
@@ -1319,12 +1203,9 @@ async function renderBookingForm(existing = null) {
           'Choose your stay dates.';
 
         return false;
-
       }
 
-
       if (checkOut <= checkIn) {
-
         feedback.className =
           'date-feedback unavailable';
 
@@ -1332,16 +1213,12 @@ async function renderBookingForm(existing = null) {
           'Check-out must be after check-in.';
 
         return false;
-
       }
 
-
       try {
-
         const result = await get(
           `/api/properties/${propertyId}/availability?checkIn=${checkIn}&checkOut=${checkOut}`
         );
-
 
         feedback.className =
           `date-feedback ${
@@ -1350,18 +1227,14 @@ async function renderBookingForm(existing = null) {
               : 'unavailable'
           }`;
 
-
         feedback.textContent =
           result.available
             ? 'These dates are available.'
             : 'These dates are not available.';
 
-
         return result.available;
 
-
       } catch {
-
         feedback.className =
           'date-feedback';
 
@@ -1369,48 +1242,32 @@ async function renderBookingForm(existing = null) {
           'Availability will be confirmed when you save.';
 
         return true;
-
       }
-
     };
-
 
     [
       'booking-property',
       'booking-checkin',
       'booking-checkout'
     ].forEach(id => {
-
       $(`#${id}`).addEventListener(
         'change',
         () => {
-
           updateAmount();
-
           checkAvailability();
-
         }
       );
-
     });
-
-
-    /* -----------------------------------------------------
-       SUBMIT
-       ----------------------------------------------------- */
 
     $('#booking-form').addEventListener(
       'submit',
       async event => {
-
         event.preventDefault();
-
 
         const button = $(
           'button[type="submit"]',
           event.currentTarget
         );
-
 
         setButtonBusy(
           button,
@@ -1420,7 +1277,6 @@ async function renderBookingForm(existing = null) {
             : 'Creating…'
         );
 
-
         const data =
           Object.fromEntries(
             new FormData(
@@ -1428,16 +1284,13 @@ async function renderBookingForm(existing = null) {
             )
           );
 
-
         data.currency =
           data.currency.toUpperCase();
 
         data.totalAmount =
           Number(data.totalAmount);
 
-
         if (!await checkAvailability()) {
-
           setButtonBusy(
             button,
             false
@@ -1449,64 +1302,75 @@ async function renderBookingForm(existing = null) {
           );
 
           return;
-
         }
 
-
         try {
+         const saved = existing
+           ? await put(
+               `/api/bookings/${existing.id}`,
+               data
+             )
+           : await post(
+               '/api/bookings',
+               data
+             );
 
-          const saved = existing
-            ? await put(
-                `/api/bookings/${existing.id}`,
-                data
-              )
-            : await post(
-                '/api/bookings',
-                data
-              );
+         if (existing) {
+           toast(
+             'Booking updated.',
+             'success'
+           );
 
-
-          toast(
-            existing
-              ? 'Booking updated.'
-              : 'Booking created.',
-            'success'
-          );
-
-
-          go(
+           go(
             `bookings/${saved.id}`
           );
 
+          return;
+        }
+
+        const guestLink = await post(
+          `/api/bookings/${saved.id}/guest-link`,
+          {}
+        );
+
+        toast(
+          'Booking created and guest link generated.',
+          'success'
+        );
+
+        const publicUrl =
+          `${window.location.origin}/guest/${guestLink.token}`;
+
+        await navigator.clipboard.writeText(publicUrl);
+
+        alert(
+          `Guest link created and copied to your clipboard:\n\n${publicUrl}`
+        );
+
+        go(
+          `bookings/${saved.id}`
+        );
 
         } catch (error) {
-
           handleFormError(
             error,
             event.currentTarget
           );
 
-
         } finally {
-
           setButtonBusy(
             button,
             false
           );
-
         }
-
       }
     );
 
-
   } catch (error) {
-
     showHostError(
       'bookings',
       error
     );
-
   }
 }
 async function renderBookingDetail(id) {

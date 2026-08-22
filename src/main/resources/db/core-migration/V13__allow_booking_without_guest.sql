@@ -1,0 +1,2 @@
+ALTER TABLE bookings
+    ALTER COLUMN guest_id DROP NOT NULL;

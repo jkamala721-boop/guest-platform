@@ -12,8 +12,19 @@ public record BookingResponse(UUID id, UUID propertyId, UUID guestId, LocalDate 
         LocalDate checkOutDate, BigDecimal totalAmount, String currency, BookingStatus status,
         String notes, Instant createdAt, Instant updatedAt) {
     public static BookingResponse from(Booking booking) {
-        return new BookingResponse(booking.getId(), booking.getProperty().getId(), booking.getGuest().getId(),
-                booking.getCheckInDate(), booking.getCheckOutDate(), booking.getTotalAmount(), booking.getCurrency(),
-                booking.getStatus(), booking.getNotes(), booking.getCreatedAt(), booking.getUpdatedAt());
+
+        return new BookingResponse(
+                booking.getId(),
+                booking.getProperty().getId(),
+                booking.getGuest() == null ? null : booking.getGuest().getId(),
+                booking.getCheckInDate(),
+                booking.getCheckOutDate(),
+                booking.getTotalAmount(),
+                booking.getCurrency(),
+                booking.getStatus(),
+                booking.getNotes(),
+                booking.getCreatedAt(),
+                booking.getUpdatedAt()
+        );
     }
 }

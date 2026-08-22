@@ -32,8 +32,8 @@ public class Booking {
     @JoinColumn(name = "property_id", nullable = false)
     private Property property;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "guest_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "guest_id", nullable = true)
     private Guest guest;
 
     @Column(name = "check_in_date", nullable = false)
@@ -64,9 +64,16 @@ public class Booking {
     protected Booking() {
     }
 
-    public Booking(Host host, Property property, Guest guest) {
-        this.host = host;
-        this.property = property;
+    public Booking(Host host, Property property) {
+    this.host = host;
+    this.property = property;
+    }
+
+    public void assignGuest(Guest guest) {
+        if (guest == null) {
+        throw new IllegalArgumentException("guest cannot be null");
+        }
+
         this.guest = guest;
     }
 
@@ -85,10 +92,16 @@ public class Booking {
         updatedAt = Instant.now();
     }
 
-    public void update(Property property, Guest guest, LocalDate checkInDate, LocalDate checkOutDate,
-            BigDecimal totalAmount, String currency, BookingStatus status, String notes) {
+    public void update(
+            Property property,
+            LocalDate checkInDate,
+            LocalDate checkOutDate,
+            BigDecimal totalAmount,
+            String currency,
+            BookingStatus status,
+            String notes) {
+
         this.property = property;
-        this.guest = guest;
         this.checkInDate = checkInDate;
         this.checkOutDate = checkOutDate;
         this.totalAmount = totalAmount;

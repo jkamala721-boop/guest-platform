@@ -15,7 +15,6 @@ import jakarta.validation.constraints.Size;
 
 public record BookingUpdateRequest(
         @NotNull UUID propertyId,
-        @NotNull UUID guestId,
         @NotNull LocalDate checkInDate,
         @NotNull LocalDate checkOutDate,
         @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal totalAmount,
