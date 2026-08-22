@@ -17,6 +17,7 @@ import com.guest_platform.dto.PaymentWebhookRequest;
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingExtension;
 import com.guest_platform.entity.BookingStatus;
+import com.guest_platform.entity.GuestLink;
 import com.guest_platform.entity.Payment;
 import com.guest_platform.entity.PaymentProvider;
 import com.guest_platform.exception.ConflictException;
@@ -75,6 +76,27 @@ public class PaymentService {
     public PaymentInitiationResponse initiate(UUID hostId, UUID bookingId, PaymentInitiateRequest request) {
         Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+            throw new ConflictException("Booking is not awaiting payment");
+        }
+        PaymentProviderAdapter provider = providers.get(request.provider());
+        if (provider == null) {
+            throw new IllegalArgumentException("Unsupported payment provider");
+        }
+        PaymentProviderAdapter.PaymentInitiation initiation = provider.initiate(booking.getTotalAmount(),
+                booking.getCurrency());
+        Payment payment = paymentRepository.save(new Payment(booking.getHost(), booking, request.provider(),
+                initiation.providerReference(), booking.getTotalAmount(), booking.getCurrency()));
+        return PaymentInitiationResponse.from(payment, initiation.nextAction());
+    }
+
+    /** Starts payment through a valid public guest link after registration. */
+    @Transactional
+    public PaymentInitiationResponse initiateForGuestLink(GuestLink guestLink, PaymentInitiateRequest request) {
+        Booking booking = guestLink.getBooking();
+        if (booking.getGuest() == null) {
+            throw new ConflictException("Guest registration is required before payment");
+        }
         if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
             throw new ConflictException("Booking is not awaiting payment");
         }

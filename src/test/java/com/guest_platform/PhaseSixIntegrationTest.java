@@ -241,7 +241,16 @@ class PhaseSixIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/bookings").header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated()).andReturn();
-        return json(result).get("id").asText();
+        String bookingId = json(result).get("id").asText();
+        String guestToken = json(mockMvc.perform(post("/api/bookings/{bookingId}/guest-link", bookingId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isCreated()).andReturn()).get("token").asText();
+        mockMvc.perform(put("/api/public/guest/{token}/registration", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Registered Guest\",\"phone\":\"+254722333444\",\"email\":\"registered."
+                                + bookingId + "@example.com\"}"))
+                .andExpect(status().isNoContent());
+        return bookingId;
     }
 
     private Map<String, Object> bookingPayload(String propertyId, String guestId, LocalDate checkIn, LocalDate checkOut,

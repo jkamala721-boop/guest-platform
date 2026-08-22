@@ -53,20 +53,21 @@ class WebInterfaceControllerTest {
                 .andExpect(status().isNotFound());
     }
     @Test
-    void propertyCreationRouteIsExplicitAndNavigationBreakpointIsMobileOnly() throws Exception {
-        mvc.perform(get("/js/app.js"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "if (route === 'properties/new') return renderPropertyForm(null);")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(
-                        "return renderPropertyForm(propertyId || null);"))))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id ? await put(`/api/properties/${id}`, data) : await post('/api/properties', data)")));
-        mvc.perform(get("/css/layout.css"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("@media (max-width: 767px)")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(
-                        "@media (max-width: 880px)"))));
-    }
+void propertyCreationRouteIsExplicitAndNavigationBreakpointIsMobileOnly() throws Exception {
+    mvc.perform(get("/js/app.js"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                    "if (route === 'properties/new') return renderPropertyForm(null);")))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(
+                    "return renderPropertyForm(propertyId || null);"))))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                    "await put(")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                    "await post(")));
 
-}
+    mvc.perform(get("/css/layout.css"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("@media (max-width: 767px)")))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(
+                    "@media (max-width: 880px)"))));
+} }

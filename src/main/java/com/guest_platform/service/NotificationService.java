@@ -120,6 +120,14 @@ public class NotificationService {
     }
 
     private void synchronize(Booking booking, Instant now) {
+        // A booking is valid before its guest completes the secure-link
+        // registration. Guest notifications cannot be delivered without a
+        // recipient, so defer scheduling until registration attaches one.
+        if (booking.getGuest() == null) {
+            notificationRepository.findAllByBookingId(booking.getId()).forEach(Notification::cancel);
+            return;
+        }
+
         Instant checkInAt = booking.getCheckInDate().atTime(booking.getProperty().getCheckInTime())
                 .toInstant(ZoneOffset.UTC);
         Instant checkOutAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
@@ -156,6 +164,10 @@ public class NotificationService {
     private void deliverDueNotification(UUID notificationId, Instant now) {
         Notification notification = notificationRepository.findForUpdateById(notificationId).orElse(null);
         if (notification == null || !notification.isDueAt(now)) {
+            return;
+        }
+        if (notification.getGuest() == null) {
+            notification.cancel();
             return;
         }
         if (!isRelevantAtDelivery(notification, now)) {

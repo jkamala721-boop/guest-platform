@@ -125,7 +125,7 @@ class PhaseThreeIntegrationTest {
                         .header("Authorization", bearer(otherToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                bookingPayload(otherPropertyId, ownerGuestId, start.plusDays(5), start.plusDays(7),
+                                bookingPayload(ownerPropertyId, ownerGuestId, start.plusDays(8), start.plusDays(10),
                                         "PENDING_CONFIRMATION"))))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(otherToken)))

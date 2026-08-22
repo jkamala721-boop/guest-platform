@@ -122,6 +122,17 @@ public class Booking {
         return true;
     }
 
+    /**
+     * A standard host-created booking awaits guest registration before it can
+     * enter the payment workflow.  The transition is intentionally performed
+     * by the secure guest-link flow, not by a browser-only payment response.
+     */
+    public void prepareForPayment() {
+        if (status == BookingStatus.PENDING_CONFIRMATION) {
+            status = BookingStatus.PENDING_PAYMENT;
+        }
+    }
+
     public void extendTo(LocalDate newCheckOutDate, BigDecimal resultingTotalAmount) {
         if (!newCheckOutDate.isAfter(checkOutDate)) {
             throw new IllegalArgumentException("newCheckOutDate must be after the current checkOutDate");

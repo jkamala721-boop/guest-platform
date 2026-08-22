@@ -43,10 +43,9 @@ class PhaseFiveIntegrationTest {
     void sameGuestLinkUpdatesRegistrationThenBecomesThePaidStayPage() throws Exception {
         String hostToken = register("phase5-stay@example.com", "Stay Page Host");
         String propertyId = createProperty(hostToken, "Stay Page Property");
-        String guestId = createGuest(hostToken, "Original Guest");
         LocalDate checkIn = LocalDate.now().plusDays(120);
         LocalDate checkOut = checkIn.plusDays(3);
-        String bookingId = createBooking(hostToken, propertyId, guestId, checkIn, checkOut, "PENDING_PAYMENT");
+        String bookingId = createBooking(hostToken, propertyId, null, checkIn, checkOut, "PENDING_CONFIRMATION");
         String guestToken = createGuestLink(hostToken, bookingId);
         String expectedExpiry = checkOut.atTime(10, 0).toInstant(ZoneOffset.UTC).toString();
 
@@ -77,7 +76,13 @@ class PhaseFiveIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registration)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/guests/{guestId}", guestId).header("Authorization", bearer(hostToken)))
+        String registeredGuestId = json(mockMvc.perform(get("/api/bookings/{bookingId}", bookingId)
+                        .header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"))
+                .andExpect(jsonPath("$.guestId").isNotEmpty())
+                .andReturn()).get("guestId").asText();
+        mockMvc.perform(get("/api/guests/{guestId}", registeredGuestId).header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Registered Guest"))
                 .andExpect(jsonPath("$.email").value("registered.guest@example.com"))
@@ -88,7 +93,7 @@ class PhaseFiveIntegrationTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/public/guest/{token}/receipt", guestToken)).andExpect(status().isNotFound());
 
-        String paymentId = initiate(hostToken, bookingId);
+        String paymentId = initiatePublic(guestToken);
         mockMvc.perform(get("/api/public/guest/{token}", guestToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("REGISTRATION_OR_PAYMENT"))
@@ -253,6 +258,14 @@ class PhaseFiveIntegrationTest {
     private String initiate(String token, String bookingId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId)
                         .header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"MPESA\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        return json(result).get("id").asText();
+    }
+
+    private String initiatePublic(String guestToken) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/public/guest/{token}/payments", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"MPESA\"}"))
                 .andExpect(status().isCreated()).andReturn();
         return json(result).get("id").asText();

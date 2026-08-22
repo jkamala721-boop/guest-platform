@@ -1341,10 +1341,9 @@ async function renderBookingForm(existing = null) {
         const publicUrl =
           `${window.location.origin}/guest/${guestLink.token}`;
 
-        await navigator.clipboard.writeText(publicUrl);
-
-        alert(
-          `Guest link created and copied to your clipboard:\n\n${publicUrl}`
+        sessionStorage.setItem(
+          `hostvero.guest-link.${saved.id}`,
+          publicUrl
         );
 
         go(
@@ -1404,6 +1403,10 @@ async function renderBookingDetail(id) {
 
     const guest = guests.find(
       item => item.id === booking.guestId
+    );
+
+    const guestLinkUrl = sessionStorage.getItem(
+      `hostvero.guest-link.${booking.id}`
     );
 
     const [payments, notifications, receipt] = await Promise.all([
@@ -1633,13 +1636,26 @@ async function renderBookingDetail(id) {
               Book again
             </button>
 
-            <button
-              class="button secondary"
-              data-guest-link
-              type="button"
-            >
-              Create guest link
-            </button>
+            ${
+              guestLinkUrl
+                ? `
+                  <div class="field">
+                    <label for="guest-link-value">Secure guest link</label>
+                    <input id="guest-link-value" readonly value="${escapeHtml(guestLinkUrl)}">
+                  </div>
+                  <button class="button secondary" data-copy-link type="button">Copy link</button>
+                  <a class="button secondary" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Your Hostvero guest link: ${guestLinkUrl}`)}">Send via WhatsApp</a>
+                `
+                : `
+                  <button
+                    class="button secondary"
+                    data-guest-link
+                    type="button"
+                  >
+                    Create guest link
+                  </button>
+                `
+            }
 
             ${
               booking.status === 'PENDING_PAYMENT'
@@ -1826,10 +1842,20 @@ async function renderBookingDetail(id) {
     );
 
 
-    $('[data-guest-link]').addEventListener(
+    $('[data-guest-link]')?.addEventListener(
       'click',
       () => createGuestLink(id)
     );
+
+    $('[data-copy-link]')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(guestLinkUrl);
+        toast('Guest link copied.', 'success');
+      } catch {
+        $('#guest-link-value').select();
+        toast('Select and copy the guest link.', '');
+      }
+    });
 
 
     $('[data-initiate-payment]')
@@ -1874,7 +1900,7 @@ async function renderBookingDetail(id) {
   }
 }
 
-async function createGuestLink(bookingId) { try { const link = await post(`/api/bookings/${bookingId}/guest-link`, {}); const url = `${location.origin}/guest/${link.token}`; const modal = openModal({ title: 'Guest link created', body: `<p class="notice">Copy this link now. For security, Hostvero never retrieves it from a token hash later.</p><div class="field" style="margin-top:1rem"><label for="guest-link-value">Secure guest link</label><input id="guest-link-value" readonly value="${escapeHtml(url)}"></div>`, actions: '<button class="button" type="button" data-copy-link>Copy link</button>' }); $('[data-copy-link]', modal.root).addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Guest link copied.', 'success'); } catch { $('#guest-link-value', modal.root).select(); toast('Select and copy the link.', ''); } }); } catch (error) { toast(error.message, 'error'); } }
+async function createGuestLink(bookingId) { try { const link = await post(`/api/bookings/${bookingId}/guest-link`, {}); const url = `${location.origin}/guest/${link.token}`; sessionStorage.setItem(`hostvero.guest-link.${bookingId}`, url); const modal = openModal({ title: 'Guest link created', body: `<p class="notice">Copy this link now. For security, Hostvero never retrieves it from a token hash later.</p><div class="field" style="margin-top:1rem"><label for="guest-link-value">Secure guest link</label><input id="guest-link-value" readonly value="${escapeHtml(url)}"></div>`, actions: `<button class="button" type="button" data-copy-link>Copy link</button><a class="button secondary" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Your Hostvero guest link: ${url}`)}">Send via WhatsApp</a>` }); $('[data-copy-link]', modal.root).addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Guest link copied.', 'success'); } catch { $('#guest-link-value', modal.root).select(); toast('Select and copy the link.', ''); } }); } catch (error) { toast(error.message, 'error'); } }
 
 function initiatePayment(path, successMessage) { const modal = openModal({ title: 'Initiate payment', body: '<p class="muted">Choose the configured payment provider. Payment success is always verified server-side.</p><div class="field"><label for="payment-provider">Provider</label><select id="payment-provider"><option value="MPESA">M-Pesa</option><option value="STRIPE">Stripe</option></select></div>', actions: '<button class="button" type="button" data-start-payment>Initiate payment</button>' }); $('[data-start-payment]', modal.root).addEventListener('click', async event => { const button = event.currentTarget; setButtonBusy(button, true, 'Starting…'); try { const result = await post(path, { provider: $('#payment-provider', modal.root).value }); modal.close(); openModal({ title: 'Payment initiated', body: `<div class="notice">${escapeHtml(successMessage)}</div><div class="detail-list" style="margin-top:1rem"><div class="detail-row"><span>Amount</span><strong>${formatMoney(result.amount, result.currency)}</strong></div><div class="detail-row"><span>Reference</span><strong>${escapeHtml(result.providerReference)}</strong></div><div class="detail-row"><span>Status</span>${badge(result.status)}</div></div>` }); } catch (error) { toast(error.message, 'error'); setButtonBusy(button, false); } }); }
 
@@ -4648,6 +4674,10 @@ async function renderPublicGuest() {
 
 
 function renderRegistrationStay(result, token) {
+  if (!result.registrationRequired) {
+    return renderPaymentStay(result);
+  }
+
   return `
     <section class="public-summary">
 
@@ -4858,6 +4888,33 @@ function renderRegistrationStay(result, token) {
 
       </form>
 
+    </section>
+  `;
+}
+
+function renderPaymentStay(result) {
+  const paymentPending = result.payment.status !== 'PROCESSING';
+  return `
+    <section class="public-summary">
+      <div class="public-summary-item"><span>Check-in</span><strong>${formatDate(result.stay.checkInDate)}</strong></div>
+      <div class="public-summary-item"><span>Check-out</span><strong>${formatDate(result.stay.checkOutDate)}</strong></div>
+      <div class="public-summary-item"><span>Amount due</span><strong>${formatMoney(result.payment.amount, result.payment.currency)}</strong></div>
+      <div class="public-summary-item"><span>Payment</span><div>${badge(result.payment.status)}</div></div>
+    </section>
+    <section class="public-section">
+      <header class="public-section-header">
+        <h2>${paymentPending ? 'Complete payment' : 'Payment in progress'}</h2>
+        <p>${paymentPending ? 'Choose a payment provider to start the secure payment process.' : 'Hostvero will unlock your stay after the provider verifies payment.'}</p>
+      </header>
+      ${paymentPending ? `
+        <form id="public-payment" class="public-registration-form">
+          <div class="field">
+            <label for="public-payment-provider">Payment method</label>
+            <select id="public-payment-provider" name="provider"><option value="MPESA">M-Pesa</option><option value="STRIPE">Stripe</option></select>
+          </div>
+          <div class="public-form-actions"><button class="button" type="submit">Continue to payment</button></div>
+        </form>
+      ` : '<div class="public-form-note">Do not close this page. Refresh after your provider confirms payment.</div>'}
     </section>
   `;
 }
@@ -5101,7 +5158,7 @@ function renderActiveStay(result, token) {
     </section>
   `;
 }
-function bindPublicForms() { const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || ''); $('#public-registration')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { await put(`/api/public/guest/${encodeURIComponent(token)}/registration`, Object.fromEntries(new FormData(event.currentTarget))); toast('Your details have been saved.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-extend')?.addEventListener('click', () => publicStayAction(token, 'extend')); $('#public-book-again')?.addEventListener('click', () => publicStayAction(token, 'again')); }
+function bindPublicForms() { const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || ''); $('#public-registration')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { await put(`/api/public/guest/${encodeURIComponent(token)}/registration`, Object.fromEntries(new FormData(event.currentTarget))); await renderPublicGuest(); bindPublicForms(); toast('Your details have been saved. Continue to payment.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-payment')?.addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true, 'Starting…'); try { const payment = await post(`/api/public/guest/${encodeURIComponent(token)}/payments`, Object.fromEntries(new FormData(event.currentTarget))); await renderPublicGuest(); bindPublicForms(); toast(payment.nextAction || 'Payment initiated. Await provider verification.', 'success'); } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); } }); $('#public-extend')?.addEventListener('click', () => publicStayAction(token, 'extend')); $('#public-book-again')?.addEventListener('click', () => publicStayAction(token, 'again')); }
 
 function publicStayAction(token, type) { const extend = type === 'extend'; const modal = openModal({ title: extend ? 'Extend your stay' : 'Book again', body: `<p class="muted">Hostvero will check availability before creating your request.</p><form id="public-stay-form">${extend ? '<div class="field"><label>New checkout date</label><input name="newCheckOutDate" type="date" required></div>' : '<div class="form-grid"><div class="field"><label>Check-in date</label><input name="checkInDate" type="date" required></div><div class="field"><label>Check-out date</label><input name="checkOutDate" type="date" required></div></div>'}<div class="form-actions"><button class="button" type="submit">Check availability</button></div></form>` }); $('#public-stay-form', modal.root).addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { const result = await post(`/api/public/guest/${encodeURIComponent(token)}/${extend ? 'extend' : 'book-again'}`, Object.fromEntries(new FormData(event.currentTarget))); modal.close(); toast(extend && result.status === 'PENDING_PAYMENT' ? 'Extension payment is required before your checkout changes.' : extend ? 'Your stay request was confirmed.' : 'Your future booking was created.', 'success'); renderPublicGuest(); } catch (error) { toast(error.status === 409 ? 'Those dates are no longer available.' : error.message, 'error'); setButtonBusy(button, false); } }); }
 
@@ -5185,7 +5242,7 @@ async function renderRoute() {
   const route = hashRoute(); if (route === 'login' || route === 'register') { renderAuth(route); return; }
   if (!session.token) { go('login'); return; }
   try { state.host = state.host || await get('/api/me'); } catch (error) { session.clear(); state.host = null; go('login'); return; }
-  if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go('overview');
+  if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route === 'properties/new') return renderPropertyForm(null); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go('overview');
 }
 
 window.addEventListener('hashchange', renderRoute);

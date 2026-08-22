@@ -8,11 +8,12 @@ import com.guest_platform.entity.GuestLink;
 import com.guest_platform.entity.GuestLinkState;
 import com.guest_platform.entity.PaymentStatus;
 
-public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Instant expiresAt,
+public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Instant expiresAt, boolean registrationRequired,
         PropertyPreview property, StayPreview stay, PaymentPreview payment) implements PublicGuestLinkResponse {
 
     public static PublicGuestRegistrationOrPaymentResponse from(GuestLink guestLink, PaymentStatus paymentStatus) {
         return new PublicGuestRegistrationOrPaymentResponse(guestLink.getState(), guestLink.getExpiresAt(),
+                guestLink.getBooking().getGuest() == null,
                 new PropertyPreview(guestLink.getBooking().getProperty().getName(),
                         guestLink.getBooking().getProperty().getAddress()),
                 new StayPreview(guestLink.getBooking().getCheckInDate(), guestLink.getBooking().getCheckOutDate()),

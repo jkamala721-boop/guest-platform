@@ -44,15 +44,17 @@ public class GuestLinkService {
     private final PaymentRepository paymentRepository;
     private final ReceiptRepository receiptRepository;
     private final GuestRepository guestRepository;
+    private final NotificationService notificationService;
 
-   public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
+    public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
             PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
-            GuestRepository guestRepository) {
+            GuestRepository guestRepository, NotificationService notificationService) {
         this.bookingRepository = bookingRepository;
         this.guestLinkRepository = guestLinkRepository;
         this.paymentRepository = paymentRepository;
         this.receiptRepository = receiptRepository;
         this.guestRepository = guestRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -111,7 +113,7 @@ public class GuestLinkService {
         return PublicGuestRegistrationOrPaymentResponse.from(guestLink, status);
     }
 
-   @Transactional
+    @Transactional
     public void updateGuestRegistration(String token, PublicGuestRegistrationRequest request) {
         GuestLink guestLink = resolveUsableGuestLink(token);
 
@@ -152,6 +154,9 @@ public class GuestLinkService {
                     guest.getNotes()
             );
         }
+
+        booking.prepareForPayment();
+        notificationService.reconcileBooking(booking.getId());
     }
 
     @Transactional

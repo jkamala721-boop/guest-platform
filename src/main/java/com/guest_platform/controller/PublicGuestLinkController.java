@@ -58,6 +58,13 @@ public class PublicGuestLinkController {
         return org.springframework.http.ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{token}/payments")
+    public org.springframework.http.ResponseEntity<PaymentInitiationResponse> initiatePayment(@PathVariable String token,
+            @Valid @RequestBody PaymentInitiateRequest request) {
+        return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(paymentService.initiateForGuestLink(guestLinkService.resolveUsableGuestLink(token), request));
+    }
+
     @GetMapping("/{token}/receipt")
     public PublicReceiptResponse receipt(@PathVariable String token) {
         return receiptService.getPublic(token);
