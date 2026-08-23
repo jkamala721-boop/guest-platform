@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.guest_platform.dto.GuestLinkCreateResponse;
@@ -45,16 +46,19 @@ public class GuestLinkService {
     private final ReceiptRepository receiptRepository;
     private final GuestRepository guestRepository;
     private final NotificationService notificationService;
+    private final long emailVerificationResendCooldownSeconds;
 
     public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
             PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
-            GuestRepository guestRepository, NotificationService notificationService) {
+            GuestRepository guestRepository, NotificationService notificationService,
+            @Value("${app.guest-email-verification.resend-cooldown-seconds:60}") long emailVerificationResendCooldownSeconds) {
         this.bookingRepository = bookingRepository;
         this.guestLinkRepository = guestLinkRepository;
         this.paymentRepository = paymentRepository;
         this.receiptRepository = receiptRepository;
         this.guestRepository = guestRepository;
         this.notificationService = notificationService;
+        this.emailVerificationResendCooldownSeconds = emailVerificationResendCooldownSeconds;
     }
 
     @Transactional
@@ -110,7 +114,7 @@ public class GuestLinkService {
         PaymentStatus status = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(guestLink.getBooking().getId())
                 .map(Payment::getStatus)
                 .orElse(PaymentStatus.PENDING);
-        return PublicGuestRegistrationOrPaymentResponse.from(guestLink, status);
+        return PublicGuestRegistrationOrPaymentResponse.from(guestLink, status, emailVerificationResendCooldownSeconds);
     }
 
     @Transactional

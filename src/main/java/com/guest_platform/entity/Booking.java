@@ -52,6 +52,10 @@ public class Booking {
     @Column(nullable = false, length = 40)
     private BookingStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "guest_access_policy", nullable = false, length = 30)
+    private GuestAccessPolicy guestAccessPolicy = GuestAccessPolicy.AFTER_PAYMENT;
+
     @Column(length = 2000)
     private String notes;
 
@@ -83,6 +87,9 @@ public class Booking {
             id = UUID.randomUUID();
         }
         Instant now = Instant.now();
+        if (guestAccessPolicy == null) {
+            guestAccessPolicy = GuestAccessPolicy.AFTER_PAYMENT;
+        }
         createdAt = now;
         updatedAt = now;
     }
@@ -122,6 +129,13 @@ public class Booking {
         return true;
     }
 
+    public void setGuestAccessPolicy(GuestAccessPolicy guestAccessPolicy) {
+        if (guestAccessPolicy == null) {
+            throw new IllegalArgumentException("guestAccessPolicy cannot be null");
+        }
+        this.guestAccessPolicy = guestAccessPolicy;
+    }
+
     /**
      * A standard host-created booking awaits guest registration before it can
      * enter the payment workflow.  The transition is intentionally performed
@@ -150,6 +164,7 @@ public class Booking {
     public BigDecimal getTotalAmount() { return totalAmount; }
     public String getCurrency() { return currency; }
     public BookingStatus getStatus() { return status; }
+    public GuestAccessPolicy getGuestAccessPolicy() { return guestAccessPolicy; }
     public String getNotes() { return notes; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

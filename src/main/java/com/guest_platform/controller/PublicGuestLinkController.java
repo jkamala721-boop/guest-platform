@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.guest_platform.dto.PublicGuestLinkResponse;
 import com.guest_platform.dto.PublicGuestRegistrationRequest;
+import com.guest_platform.dto.EmailVerificationConfirmRequest;
+import com.guest_platform.dto.EmailVerificationResponse;
 import com.guest_platform.dto.PublicReceiptResponse;
 import com.guest_platform.dto.ReceiptDocument;
 import com.guest_platform.dto.ExtendStayRequest;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
 import com.guest_platform.service.GuestLinkService;
+import com.guest_platform.service.GuestEmailVerificationService;
 import com.guest_platform.service.ReceiptService;
 
 import jakarta.validation.Valid;
@@ -35,14 +38,17 @@ import jakarta.validation.Valid;
 public class PublicGuestLinkController {
 
     private final GuestLinkService guestLinkService;
+    private final GuestEmailVerificationService emailVerificationService;
     private final ReceiptService receiptService;
     private final BookingExtensionService extensionService;
     private final PaymentService paymentService;
     private final AvailabilityService availabilityService;
 
-    public PublicGuestLinkController(GuestLinkService guestLinkService, ReceiptService receiptService,
+    public PublicGuestLinkController(GuestLinkService guestLinkService, GuestEmailVerificationService emailVerificationService,
+            ReceiptService receiptService,
             BookingExtensionService extensionService, PaymentService paymentService, AvailabilityService availabilityService) {
         this.guestLinkService = guestLinkService;
+        this.emailVerificationService = emailVerificationService;
         this.receiptService = receiptService;
         this.extensionService = extensionService; this.paymentService = paymentService; this.availabilityService = availabilityService;
     }
@@ -57,6 +63,17 @@ public class PublicGuestLinkController {
             @Valid @RequestBody PublicGuestRegistrationRequest request) {
         guestLinkService.updateGuestRegistration(token, request);
         return org.springframework.http.ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{token}/email-verification")
+    public EmailVerificationResponse requestEmailVerification(@PathVariable String token) {
+        return emailVerificationService.requestCode(token);
+    }
+
+    @PostMapping("/{token}/email-verification/confirm")
+    public EmailVerificationResponse confirmEmailVerification(@PathVariable String token,
+            @Valid @RequestBody EmailVerificationConfirmRequest request) {
+        return emailVerificationService.confirmCode(token, request.code());
     }
 
     @PostMapping("/{token}/payments")

@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.guest_platform.entity.Notification;
+import com.guest_platform.entity.NotificationChannel;
 import com.guest_platform.entity.NotificationStatus;
 import com.guest_platform.entity.NotificationType;
 import com.guest_platform.repository.NotificationRepository;
@@ -68,6 +69,7 @@ class PhaseSixIntegrationTest {
         Notification twoDay = notification(bookingId, NotificationType.TWO_DAY_REMINDER);
         Notification paymentRequest = notification(bookingId, NotificationType.TWENTY_FOUR_HOUR_PAYMENT_REQUEST);
         Notification paymentReminder = notification(bookingId, NotificationType.PAYMENT_REMINDER);
+        assertEquals(NotificationChannel.MOCK, twoDay.getChannel());
         assertEquals(checkInAt.minusSeconds(48 * 60 * 60), twoDay.getScheduledAt());
         assertEquals(checkInAt.minusSeconds(24 * 60 * 60), paymentRequest.getScheduledAt());
         assertEquals(checkInAt.minusSeconds(12 * 60 * 60), paymentReminder.getScheduledAt());
@@ -161,6 +163,57 @@ class PhaseSixIntegrationTest {
     }
 
     @Test
+    void reconciliationSchedulesOnlyFutureTriggersAndNeverBackfillsMissedReminders() throws Exception {
+        String hostToken = register("phase6-future-only@example.com", "Future Only Host");
+        String propertyId = createProperty(hostToken, "Future Only Property");
+        String guestId = createGuest(hostToken, "Future Only Guest");
+        LocalDate checkIn = LocalDate.of(2030, 5, 10);
+        String bookingId = createBooking(hostToken, propertyId, guestId, checkIn, checkIn.plusDays(2), "PENDING_PAYMENT");
+        java.util.UUID bookingUuid = java.util.UUID.fromString(bookingId);
+
+        clearNotifications(bookingUuid);
+        notificationService.reconcileBooking(bookingUuid, Instant.parse("2030-05-10T08:00:00Z"));
+        assertFalse(notificationRepository.findByBookingIdAndType(bookingUuid, NotificationType.TWO_DAY_REMINDER)
+                .isPresent());
+        assertFalse(notificationRepository.findByBookingIdAndType(bookingUuid,
+                NotificationType.TWENTY_FOUR_HOUR_PAYMENT_REQUEST).isPresent());
+        assertFalse(notificationRepository.findByBookingIdAndType(bookingUuid, NotificationType.PAYMENT_REMINDER)
+                .isPresent());
+        assertEquals(Instant.parse("2030-05-12T09:00:00Z"),
+                notification(bookingId, NotificationType.CHECKOUT_REMINDER).getScheduledAt());
+
+        clearNotifications(bookingUuid);
+        notificationService.reconcileBooking(bookingUuid, Instant.parse("2030-05-08T20:00:00Z"));
+        assertFalse(notificationRepository.findByBookingIdAndType(bookingUuid, NotificationType.TWO_DAY_REMINDER)
+                .isPresent());
+        assertEquals(Instant.parse("2030-05-09T14:00:00Z"),
+                notification(bookingId, NotificationType.TWENTY_FOUR_HOUR_PAYMENT_REQUEST).getScheduledAt());
+
+        clearNotifications(bookingUuid);
+        notificationService.reconcileBooking(bookingUuid, Instant.parse("2030-05-08T13:00:00Z"));
+        assertEquals(Instant.parse("2030-05-08T14:00:00Z"),
+                notification(bookingId, NotificationType.TWO_DAY_REMINDER).getScheduledAt());
+        assertEquals(Instant.parse("2030-05-09T14:00:00Z"),
+                notification(bookingId, NotificationType.TWENTY_FOUR_HOUR_PAYMENT_REQUEST).getScheduledAt());
+    }
+
+    @Test
+    void legitimatelyScheduledReminderRemainsDeliverableAfterItBecomesDue() throws Exception {
+        String hostToken = register("phase6-due@example.com", "Due Host");
+        String propertyId = createProperty(hostToken, "Due Property");
+        String guestId = createGuest(hostToken, "Due Guest");
+        LocalDate checkIn = LocalDate.of(2030, 6, 10);
+        String bookingId = createBooking(hostToken, propertyId, guestId, checkIn, checkIn.plusDays(2), "PENDING_PAYMENT");
+        java.util.UUID bookingUuid = java.util.UUID.fromString(bookingId);
+        Instant trigger = Instant.parse("2030-06-08T14:00:00Z");
+
+        notificationService.reconcileBooking(bookingUuid, trigger.plusSeconds(1));
+        assertEquals(NotificationStatus.PENDING, notification(bookingId, NotificationType.TWO_DAY_REMINDER).getStatus());
+        notificationService.deliverDueNotifications(trigger.plusSeconds(1));
+        assertEquals(NotificationStatus.SENT, notification(bookingId, NotificationType.TWO_DAY_REMINDER).getStatus());
+    }
+
+    @Test
     void bookingDateChangeReschedulesPendingNotifications() throws Exception {
         String hostToken = register("phase6-reschedule@example.com", "Reschedule Host");
         String propertyId = createProperty(hostToken, "Reschedule Property");
@@ -207,6 +260,11 @@ class PhaseSixIntegrationTest {
 
     private Notification notification(String bookingId, NotificationType type) {
         return notificationRepository.findByBookingIdAndType(java.util.UUID.fromString(bookingId), type).orElseThrow();
+    }
+
+    private void clearNotifications(java.util.UUID bookingId) {
+        notificationRepository.findAllByBookingId(bookingId).forEach(notificationRepository::delete);
+        notificationRepository.flush();
     }
 
     private String register(String email, String fullName) throws Exception {

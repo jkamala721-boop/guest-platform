@@ -19,6 +19,7 @@ import com.guest_platform.dto.BookingCreateRequest;
 import com.guest_platform.dto.BookingResponse;
 import com.guest_platform.dto.BookingUpdateRequest;
 import com.guest_platform.dto.GuestLinkCreateResponse;
+import com.guest_platform.dto.GuestAccessPolicyUpdateRequest;
 import com.guest_platform.security.CurrentHost;
 import com.guest_platform.service.BookingService;
 import com.guest_platform.service.GuestLinkService;
@@ -58,6 +59,12 @@ public class BookingController {
     public BookingResponse update(Authentication authentication, @PathVariable UUID bookingId,
             @Valid @RequestBody BookingUpdateRequest request) {
         return bookingService.update(CurrentHost.id(authentication), bookingId, request);
+    }
+
+    @PutMapping("/{bookingId}/guest-access-policy")
+    public BookingResponse updateGuestAccessPolicy(Authentication authentication, @PathVariable UUID bookingId,
+            @Valid @RequestBody GuestAccessPolicyUpdateRequest request) {
+        return bookingService.updateGuestAccessPolicy(CurrentHost.id(authentication), bookingId, request);
     }
 
     @DeleteMapping("/{bookingId}")

@@ -7,10 +7,11 @@ import java.util.UUID;
 
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
+import com.guest_platform.entity.GuestAccessPolicy;
 
 public record BookingResponse(UUID id, UUID propertyId, UUID guestId, LocalDate checkInDate,
         LocalDate checkOutDate, BigDecimal totalAmount, String currency, BookingStatus status,
-        String notes, Instant createdAt, Instant updatedAt) {
+        GuestAccessPolicy guestAccessPolicy, String notes, Instant createdAt, Instant updatedAt) {
     public static BookingResponse from(Booking booking) {
 
         return new BookingResponse(
@@ -22,6 +23,7 @@ public record BookingResponse(UUID id, UUID propertyId, UUID guestId, LocalDate 
                 booking.getTotalAmount(),
                 booking.getCurrency(),
                 booking.getStatus(),
+                booking.getGuestAccessPolicy(),
                 booking.getNotes(),
                 booking.getCreatedAt(),
                 booking.getUpdatedAt()

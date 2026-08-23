@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.guest_platform.dto.BookingCreateRequest;
 import com.guest_platform.dto.BookingResponse;
 import com.guest_platform.dto.BookingUpdateRequest;
+import com.guest_platform.dto.GuestAccessPolicyUpdateRequest;
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
 import com.guest_platform.entity.Guest;
@@ -69,6 +70,9 @@ public class BookingService {
         );
 
         Booking booking = new Booking(host, property);
+        if (request.guestAccessPolicy() != null) {
+            booking.setGuestAccessPolicy(request.guestAccessPolicy());
+        }
         if (request.guestId() != null) {
             Guest guest = guestRepository.findByIdAndHostId(request.guestId(), hostId)
                     .orElseThrow(() -> new ResourceNotFoundException("Guest was not found"));
@@ -117,6 +121,14 @@ public class BookingService {
         apply(booking, property, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
                 request.currency(), request.status(), request.notes());
         notificationService.reconcileBooking(booking.getId());
+        return BookingResponse.from(booking);
+    }
+
+    @Transactional
+    public BookingResponse updateGuestAccessPolicy(UUID hostId, UUID bookingId,
+            GuestAccessPolicyUpdateRequest request) {
+        Booking booking = findOwnedBooking(hostId, bookingId);
+        booking.setGuestAccessPolicy(request.policy());
         return BookingResponse.from(booking);
     }
 

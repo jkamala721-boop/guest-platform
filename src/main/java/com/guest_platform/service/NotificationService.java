@@ -99,10 +99,20 @@ public class NotificationService {
                 "Secure guest link delivery", deliveryParameters);
     }
 
+    @Transactional
+    public NotificationResponse sendEmailVerification(Booking booking, String code, long codeTtlSeconds) {
+        return send(booking, NotificationType.EMAIL_VERIFICATION, NotificationChannel.EMAIL, "Verify your Hostvero email",
+                "Email verification code delivery", List.of(code, Long.toString(codeTtlSeconds / 60)));
+    }
+
     private NotificationResponse send(Booking booking, NotificationType type, NotificationChannel channel, String subject,
             String message, List<String> deliveryParameters) {
         if (booking.getGuest() == null) {
             throw new ConflictException("A guest is required before sending a notification");
+        }
+        if (channel == NotificationChannel.EMAIL && type != NotificationType.EMAIL_VERIFICATION
+                && !booking.getGuest().isEmailVerified()) {
+            throw new ConflictException("The guest email must be verified before sending email notifications");
         }
         NotificationProvider provider = providers.get(channel);
         if (provider == null) {
@@ -216,13 +226,26 @@ public class NotificationService {
             }
             return;
         }
-        Instant scheduledAt = triggerAt.isAfter(now) ? triggerAt : now;
         if (notification == null) {
-            notificationRepository.save(new Notification(booking, type, notificationChannel, scheduledAt));
-        } else {
-            notification.refreshRecipient(booking.getGuest());
-            notification.reschedule(scheduledAt);
+            if (triggerAt.isAfter(now)) {
+                notificationRepository.save(new Notification(booking, type, notificationChannel, triggerAt));
+            }
+            return;
         }
+
+        // A notification already scheduled for this exact trigger remains a legitimate
+        // pending delivery when the scheduler reaches its due time.  By contrast, a
+        // booking-date change whose new trigger is already past invalidates a future
+        // pending schedule rather than converting it into an immediate stale reminder.
+        if (!triggerAt.isAfter(now)) {
+            if (!notification.getScheduledAt().equals(triggerAt)) {
+                notification.cancel();
+            }
+            return;
+        }
+
+        notification.refreshRecipient(booking.getGuest());
+        notification.reschedule(triggerAt);
     }
 
     private void deliverDueNotification(UUID notificationId, Instant now) {
@@ -236,6 +259,12 @@ public class NotificationService {
         }
         if (!isRelevantAtDelivery(notification, now)) {
             notification.cancel();
+            return;
+        }
+        if (notification.getChannel() == NotificationChannel.EMAIL
+                && notification.getType() != NotificationType.EMAIL_VERIFICATION
+                && !notification.getGuest().isEmailVerified()) {
+            notification.markFailed("Guest email is not verified");
             return;
         }
 
@@ -285,7 +314,7 @@ public class NotificationService {
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER -> requiresPayment(booking, checkInAt, now);
             case CHECKOUT_REMINDER -> (booking.getStatus() == BookingStatus.CONFIRMED
                     || booking.getStatus() == BookingStatus.CHECKED_IN) && checkOutAt.isAfter(now);
-            case MANUAL_MESSAGE, GUEST_LINK -> true;
+            case MANUAL_MESSAGE, GUEST_LINK, EMAIL_VERIFICATION -> true;
         };
     }
 
@@ -307,6 +336,7 @@ public class NotificationService {
                     "Mock delivery completed; guest link action is required";
             case MANUAL_MESSAGE -> "Manual notification delivered";
             case GUEST_LINK -> "Guest link notification delivered";
+            case EMAIL_VERIFICATION -> "Email verification code delivered";
             default -> "Mock delivery completed";
         };
     }

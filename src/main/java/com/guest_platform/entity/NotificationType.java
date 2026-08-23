@@ -6,5 +6,6 @@ public enum NotificationType {
     PAYMENT_REMINDER,
     CHECKOUT_REMINDER,
     MANUAL_MESSAGE,
-    GUEST_LINK
+    GUEST_LINK,
+    EMAIL_VERIFICATION
 }
