@@ -112,6 +112,13 @@ class PhaseOneIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.validationErrors.mapsUrl").exists())
                 .andExpect(jsonPath("$.validationErrors.maxGuests").exists());
+
+        mockMvc.perform(post("/api/properties")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Malformed request body"));
     }
 
     @Test

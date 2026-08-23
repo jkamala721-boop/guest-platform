@@ -26,6 +26,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("select booking from Booking booking where booking.id = :id")
     Optional<Booking> findForUpdateById(@Param("id") UUID id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select booking from Booking booking where booking.id = :id and booking.host.id = :hostId")
+    Optional<Booking> findForUpdateByIdAndHostId(@Param("id") UUID id, @Param("hostId") UUID hostId);
+
     boolean existsByPropertyIdAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(UUID propertyId,
             Collection<BookingStatus> statuses, LocalDate checkOutDate, LocalDate checkInDate);
 

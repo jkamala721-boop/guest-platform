@@ -28,14 +28,12 @@ class PhaseSevenIntegrationTest {
     private static final String PASSWORD="StrongPass!123", WEBHOOK="phase4-test-mpesa-webhook-secret";
     @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired JdbcTemplate jdbc;
 
-    @Test void unpaidExtensionRepricesAndReconcilesWithoutSelfConflict() throws Exception {
+    @Test void pendingPaymentBookingCannotExtendWithoutASeparateVerifiedPayment() throws Exception {
         String token=register("phase7-unpaid@example.com"); String property=property(token); String guest=guest(token);
         LocalDate in=LocalDate.now().plusDays(40); String booking=booking(token,property,guest,in,in.plusDays(2),"PENDING_PAYMENT");
         mvc.perform(post("/api/bookings/{id}/extend",booking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"newCheckOutDate\":\""+in.plusDays(4)+"\"}"))
-            .andExpect(status().isCreated()).andExpect(jsonPath("$.addedNights").value(2)).andExpect(jsonPath("$.additionalAmount").value(240.00)).andExpect(jsonPath("$.resultingTotalAmount").value(690.00));
-        mvc.perform(get("/api/bookings/{id}",booking).header("Authorization",bearer(token))).andExpect(status().isOk()).andExpect(jsonPath("$.checkOutDate").value(in.plusDays(4).toString())).andExpect(jsonPath("$.totalAmount").value(690.00));
-        mvc.perform(post("/api/bookings/{id}/extend",booking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"newCheckOutDate\":\""+in.plusDays(4)+"\"}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isConflict());
+        mvc.perform(get("/api/bookings/{id}",booking).header("Authorization",bearer(token))).andExpect(status().isOk()).andExpect(jsonPath("$.checkOutDate").value(in.plusDays(2).toString())).andExpect(jsonPath("$.totalAmount").value(450.00));
     }
 
     @Test void paidExtensionAppliesOnlyAfterOneVerifiedAdditionalPayment() throws Exception {
@@ -67,9 +65,32 @@ class PhaseSevenIntegrationTest {
         mvc.perform(get("/api/bookings/{id}",newBooking).header("Authorization",bearer(owner))).andExpect(status().isOk());
     }
 
+    @Test void bookAgainRejectsCancelledSourcesInactivePropertiesAndArchivedGuests() throws Exception {
+        String token=register("phase7-book-again-safety@example.com"); LocalDate in=LocalDate.now().plusDays(75);
+
+        String cancelledProperty=property(token), cancelledGuest=guest(token);
+        String cancelledBooking=booking(token,cancelledProperty,cancelledGuest,in,in.plusDays(2),"PENDING_PAYMENT");
+        mvc.perform(delete("/api/bookings/{id}",cancelledBooking).header("Authorization",bearer(token))).andExpect(status().isNoContent());
+        mvc.perform(post("/api/bookings/{id}/book-again",cancelledBooking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"checkInDate\":\""+in.plusDays(10)+"\",\"checkOutDate\":\""+in.plusDays(12)+"\"}"))
+            .andExpect(status().isConflict());
+
+        String inactiveProperty=property(token), inactiveGuest=guest(token);
+        String inactiveBooking=booking(token,inactiveProperty,inactiveGuest,in.plusDays(20),in.plusDays(22),"PENDING_PAYMENT");
+        mvc.perform(delete("/api/properties/{id}",inactiveProperty).header("Authorization",bearer(token))).andExpect(status().isNoContent());
+        mvc.perform(post("/api/bookings/{id}/book-again",inactiveBooking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"checkInDate\":\""+in.plusDays(30)+"\",\"checkOutDate\":\""+in.plusDays(32)+"\"}"))
+            .andExpect(status().isNotFound());
+
+        String archivedProperty=property(token), archivedGuest=guest(token);
+        String archivedBooking=booking(token,archivedProperty,archivedGuest,in.plusDays(40),in.plusDays(42),"PENDING_PAYMENT");
+        mvc.perform(delete("/api/guests/{id}",archivedGuest).header("Authorization",bearer(token))).andExpect(status().isNoContent());
+        mvc.perform(post("/api/bookings/{id}/book-again",archivedBooking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"checkInDate\":\""+in.plusDays(50)+"\",\"checkOutDate\":\""+in.plusDays(52)+"\"}"))
+            .andExpect(status().isConflict());
+    }
+
     @Test void extensionsRejectConflictsButAllowBackToBackDatesAndStayHostScoped() throws Exception {
         String owner=register("phase7-conflicts@example.com"), property=property(owner), guest=guest(owner); LocalDate in=LocalDate.now().plusDays(80);
         String booking=booking(owner,property,guest,in,in.plusDays(2),"PENDING_PAYMENT");
+        paySuccess(owner,booking,"phase7-conflict-original");
         booking(owner,property,guest,in.plusDays(4),in.plusDays(6),"PENDING_PAYMENT");
         mvc.perform(post("/api/bookings/{id}/extend",booking).header("Authorization",bearer(owner)).contentType(MediaType.APPLICATION_JSON).content("{\"newCheckOutDate\":\""+in.plusDays(4)+"\"}"))
             .andExpect(status().isCreated());
@@ -106,7 +127,7 @@ class PhaseSevenIntegrationTest {
 
     @Test void pendingExtensionReconciliationDoesNotDuplicateNotifications() throws Exception {
         String token=register("phase7-notifications@example.com"), property=property(token), guest=guest(token); LocalDate in=LocalDate.now().plusDays(110);
-        String booking=booking(token,property,guest,in,in.plusDays(2),"PENDING_PAYMENT"); Long before=jdbc.queryForObject("select count(*) from notifications where booking_id = ?",Long.class,java.util.UUID.fromString(booking));
+        String booking=booking(token,property,guest,in,in.plusDays(2),"PENDING_PAYMENT"); paySuccess(token,booking,"phase7-notifications-original"); Long before=jdbc.queryForObject("select count(*) from notifications where booking_id = ?",Long.class,java.util.UUID.fromString(booking));
         mvc.perform(post("/api/bookings/{id}/extend",booking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"newCheckOutDate\":\""+in.plusDays(4)+"\"}"))
             .andExpect(status().isCreated());
         Long after=jdbc.queryForObject("select count(*) from notifications where booking_id = ?",Long.class,java.util.UUID.fromString(booking));
@@ -116,7 +137,7 @@ class PhaseSevenIntegrationTest {
     private String register(String email)throws Exception{return body(mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("email",email,"password",PASSWORD,"passwordConfirmation",PASSWORD,"fullName","Phase Seven","phone","+254711111111")))).andExpect(status().isCreated()).andReturn()).get("accessToken").asText();}
     private String property(String token)throws Exception{return body(mvc.perform(post("/api/properties").header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("name","Phase Seven Property","propertyType","APARTMENT","address","1 Test Street","mapsUrl","https://maps.google.com/?q=test","maxGuests",4,"defaultNightlyRate",120,"currency","KES","checkInTime",LocalTime.of(14,0).toString(),"checkOutTime",LocalTime.of(10,0).toString(),"active",true)))).andExpect(status().isCreated()).andReturn()).get("id").asText();}
     private String guest(String token)throws Exception{return body(mvc.perform(post("/api/guests").header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Phase Seven Guest\",\"phone\":\"+254722333444\",\"email\":\"phase7guest@example.com\"}")).andExpect(status().isCreated()).andReturn()).get("id").asText();}
-    private String booking(String token,String property,String guest,LocalDate in,LocalDate out,String status)throws Exception{Map<String,Object> p=new LinkedHashMap<>();p.put("propertyId",property);p.put("checkInDate",in);p.put("checkOutDate",out);p.put("totalAmount",new BigDecimal("450"));p.put("currency","KES");p.put("status",status);String bookingId=body(mvc.perform(post("/api/bookings").header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p))).andExpect(status().isCreated()).andReturn()).get("id").asText();String tokenValue=guestLink(token,bookingId);mvc.perform(put("/api/public/guest/{token}/registration",tokenValue).contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Registered Guest\",\"phone\":\"+254722333444\",\"email\":\"registered."+bookingId+"@example.com\"}")).andExpect(status().isNoContent());return bookingId;}
+    private String booking(String token,String property,String guest,LocalDate in,LocalDate out,String status)throws Exception{Map<String,Object> p=new LinkedHashMap<>();p.put("propertyId",property);p.put("guestId",guest);p.put("checkInDate",in);p.put("checkOutDate",out);p.put("totalAmount",new BigDecimal("450"));p.put("currency","KES");p.put("status",status);String bookingId=body(mvc.perform(post("/api/bookings").header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p))).andExpect(status().isCreated()).andReturn()).get("id").asText();String tokenValue=guestLink(token,bookingId);mvc.perform(put("/api/public/guest/{token}/registration",tokenValue).contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Registered Guest\",\"phone\":\"+254722333444\",\"email\":\"registered."+bookingId+"@example.com\"}")).andExpect(status().isNoContent());return bookingId;}
     private String guestLink(String token,String booking)throws Exception{return body(mvc.perform(post("/api/bookings/{id}/guest-link",booking).header("Authorization",bearer(token))).andExpect(status().isCreated()).andReturn()).get("token").asText();}
     private void paySuccess(String token,String booking,String event)throws Exception{MvcResult p=mvc.perform(post("/api/bookings/{id}/payments",booking).header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"MPESA\"}")).andExpect(status().isCreated()).andReturn();webhook(body(p).get("providerReference").asText(),event,true);}
     private void webhook(String ref,String event,boolean success)throws Exception{mvc.perform(post("/api/webhooks/mpesa").header("X-Mpesa-Webhook-Secret",WEBHOOK).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("providerReference",ref,"eventId",event,"success",success)))).andExpect(status().isNoContent());}

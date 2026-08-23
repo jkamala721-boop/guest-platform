@@ -1,6 +1,7 @@
 package com.guest_platform.service;
 
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,6 +22,7 @@ import com.guest_platform.entity.BookingStatus;
 import com.guest_platform.entity.GuestLink;
 import com.guest_platform.entity.Payment;
 import com.guest_platform.entity.PaymentProvider;
+import com.guest_platform.entity.PaymentStatus;
 import com.guest_platform.exception.ConflictException;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.BookingExtensionRepository;
@@ -60,7 +62,7 @@ public class PaymentService {
 
     @Transactional
     public PaymentInitiationResponse initiateExtension(UUID hostId, UUID extensionId, PaymentInitiateRequest request) {
-        BookingExtension extension = bookingExtensionRepository.findByIdAndBookingHostId(extensionId, hostId)
+        BookingExtension extension = bookingExtensionRepository.findForUpdateByIdAndBookingHostId(extensionId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking extension was not found"));
         return initiateExtension(extension, request);
     }
@@ -75,7 +77,7 @@ public class PaymentService {
 
     @Transactional
     public PaymentInitiationResponse initiate(UUID hostId, UUID bookingId, PaymentInitiateRequest request) {
-        Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
+        Booking booking = bookingRepository.findForUpdateByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
         if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
             throw new ConflictException("Booking is not awaiting payment");
@@ -87,7 +89,8 @@ public class PaymentService {
     @Transactional
     public PaymentInitiationResponse initiateForGuestLink(GuestLink guestLink, String guestToken,
             PaymentInitiateRequest request) {
-        Booking booking = guestLink.getBooking();
+        Booking booking = bookingRepository.findForUpdateById(guestLink.getBooking().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
         if (booking.getGuest() == null) {
             throw new ConflictException("Guest registration is required before payment");
         }
@@ -158,6 +161,9 @@ public class PaymentService {
         if (provider == null) {
             throw new IllegalArgumentException("Unsupported payment provider");
         }
+        if (hasInProgressPayment(booking, extension)) {
+            throw new ConflictException("A payment is already in progress");
+        }
         java.math.BigDecimal amount = extension == null ? booking.getTotalAmount() : extension.getAdditionalAmount();
         String currency = extension == null ? booking.getCurrency() : extension.getCurrency();
         Payment payment = extension == null
@@ -176,16 +182,25 @@ public class PaymentService {
         if (!payment.markSucceeded(eventId)) {
             return;
         }
+        Booking booking = bookingRepository.findForUpdateById(payment.getBooking().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
         if (payment.getBookingExtension() != null) {
             if (!bookingExtensionService.applyPaidExtension(payment.getBookingExtension())) {
                 throw new ConflictException("Booking extension is no longer available");
             }
-        } else if (!payment.getBooking().confirmAfterVerifiedPayment()) {
+        } else if (!booking.confirmAfterVerifiedPayment()) {
             return;
         }
         receiptService.createForSucceededPayment(payment);
-        guestLinkService.activateForConfirmedBooking(payment.getBooking());
-        notificationService.reconcileBooking(payment.getBooking().getId());
+        guestLinkService.activateForConfirmedBooking(booking);
+        notificationService.reconcileBooking(booking.getId());
+    }
+
+    private boolean hasInProgressPayment(Booking booking, BookingExtension extension) {
+        EnumSet<PaymentStatus> activeStatuses = EnumSet.of(PaymentStatus.PENDING, PaymentStatus.PROCESSING);
+        return extension == null
+                ? paymentRepository.existsByBookingIdAndStatusIn(booking.getId(), activeStatuses)
+                : paymentRepository.existsByBookingExtensionIdAndStatusIn(extension.getId(), activeStatuses);
     }
 
     private void failVerifiedPayment(Payment payment, String eventId, String failureReason) {

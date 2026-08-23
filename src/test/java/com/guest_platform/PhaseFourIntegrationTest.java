@@ -65,6 +65,12 @@ class PhaseFourIntegrationTest {
                 .andReturn();
         String paymentId = json(result).get("id").asText();
 
+        mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId)
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"MPESA\"}"))
+                .andExpect(status().isConflict());
+
         mockMvc.perform(get("/api/payments/{paymentId}", paymentId).header("Authorization", bearer(ownerToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.amount").value(321.45));

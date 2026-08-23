@@ -1,5 +1,6 @@
 package com.guest_platform.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +25,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findFirstByBookingIdOrderByCreatedAtDesc(UUID bookingId);
 
     boolean existsByBookingIdAndStatus(UUID bookingId, PaymentStatus status);
+
+    boolean existsByBookingIdAndStatusIn(UUID bookingId, Collection<PaymentStatus> statuses);
+
+    boolean existsByBookingExtensionIdAndStatusIn(UUID extensionId, Collection<PaymentStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select payment from Payment payment where payment.id = :id")

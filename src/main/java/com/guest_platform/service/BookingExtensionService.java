@@ -41,23 +41,20 @@ public class BookingExtensionService {
 
     @Transactional
     public BookingExtensionResponse extendForHost(UUID hostId, UUID bookingId, LocalDate requestedCheckOut) {
-        Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId).orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        Booking booking = bookingRepository.findForUpdateByIdAndHostId(bookingId, hostId).orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
         return extend(booking, requestedCheckOut);
     }
     @Transactional
-    public BookingExtensionResponse extendForGuest(GuestLink link, LocalDate requestedCheckOut) { return extend(link.getBooking(), requestedCheckOut); }
+    public BookingExtensionResponse extendForGuest(GuestLink link, LocalDate requestedCheckOut) {
+        Booking booking = bookingRepository.findForUpdateById(link.getBooking().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        return extend(booking, requestedCheckOut);
+    }
     private BookingExtensionResponse extend(Booking booking, LocalDate requestedCheckOut) {
-        propertyRepository.findForUpdateById(booking.getProperty().getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
+        propertyRepository.findForUpdateById(booking.getProperty().getId())
+                .filter(com.guest_platform.entity.Property::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
         if (!requestedCheckOut.isAfter(booking.getCheckOutDate())) throw new IllegalArgumentException("newCheckOutDate must be after the current checkOutDate");
-        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
-            availabilityService.requireAvailableFor(booking.getStatus(), booking.getProperty().getId(), booking.getCheckInDate(), requestedCheckOut, booking.getId());
-            LocalDate originalCheckOut = booking.getCheckOutDate(); BigDecimal originalAmount = booking.getTotalAmount();
-            BigDecimal added = nightlyAmount(booking, requestedCheckOut); booking.extendTo(requestedCheckOut, originalAmount.add(added));
-            guestLinkService.synchronizeExpiryForBooking(booking); notificationService.reconcileBooking(booking.getId());
-            return new BookingExtensionResponse(null, booking.getId(), originalCheckOut, requestedCheckOut,
-                    Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(originalCheckOut, requestedCheckOut)),
-                    originalAmount, added, booking.getTotalAmount(), booking.getCurrency(), null, null);
-        }
         if (booking.getStatus() != BookingStatus.CONFIRMED && booking.getStatus() != BookingStatus.CHECKED_IN) throw new ConflictException("Booking cannot be extended in its current state");
         availabilityService.requireAvailableFor(booking.getStatus(), booking.getProperty().getId(), booking.getCheckOutDate(), requestedCheckOut, booking.getId());
         BookingExtension extension = extensionRepository.save(new BookingExtension(booking, requestedCheckOut, nightlyAmount(booking, requestedCheckOut), Instant.now().plusSeconds(reservationMinutes * 60)));
@@ -65,12 +62,24 @@ public class BookingExtensionService {
     }
     @Transactional
     public BookAgainResponse bookAgainForHost(UUID hostId, UUID bookingId, BookAgainRequest request) {
-        Booking source=bookingRepository.findByIdAndHostId(bookingId,hostId).orElseThrow(()->new ResourceNotFoundException("Booking was not found")); return bookAgain(source,request);
+        Booking source=bookingRepository.findForUpdateByIdAndHostId(bookingId,hostId).orElseThrow(()->new ResourceNotFoundException("Booking was not found")); return bookAgain(source,request);
     }
     @Transactional
-    public BookAgainResponse bookAgainForGuest(GuestLink link, BookAgainRequest request) { return bookAgain(link.getBooking(),request); }
+    public BookAgainResponse bookAgainForGuest(GuestLink link, BookAgainRequest request) {
+        Booking source = bookingRepository.findForUpdateById(link.getBooking().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        return bookAgain(source,request);
+    }
     private BookAgainResponse bookAgain(Booking source, BookAgainRequest request) {
-        propertyRepository.findForUpdateById(source.getProperty().getId()).orElseThrow(()->new ResourceNotFoundException("Property was not found"));
+        if (source.getStatus() == BookingStatus.CANCELLED) {
+            throw new ConflictException("A cancelled booking cannot be booked again");
+        }
+        propertyRepository.findForUpdateById(source.getProperty().getId())
+                .filter(com.guest_platform.entity.Property::isActive)
+                .orElseThrow(()->new ResourceNotFoundException("Property was not found"));
+        if (source.getGuest() != null && !source.getGuest().isActive()) {
+            throw new ConflictException("The booking guest is no longer active");
+        }
         availabilityService.requireAvailableFor(BookingStatus.PENDING_PAYMENT, source.getProperty().getId(), request.checkInDate(), request.checkOutDate(), null);
        Booking repeat = new Booking(
                 source.getHost(),

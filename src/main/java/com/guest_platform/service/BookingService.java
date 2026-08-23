@@ -113,7 +113,7 @@ public class BookingService {
 
     @Transactional
     public BookingResponse update(UUID hostId, UUID bookingId, BookingUpdateRequest request) {
-        Booking booking = findOwnedBooking(hostId, bookingId);
+        Booking booking = findOwnedBookingForUpdate(hostId, bookingId);
         Property property = findActiveOwnedProperty(hostId, request.propertyId());
         property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
         availabilityService.requireAvailableFor(request.status(), property.getId(), request.checkInDate(),
@@ -127,14 +127,14 @@ public class BookingService {
     @Transactional
     public BookingResponse updateGuestAccessPolicy(UUID hostId, UUID bookingId,
             GuestAccessPolicyUpdateRequest request) {
-        Booking booking = findOwnedBooking(hostId, bookingId);
+        Booking booking = findOwnedBookingForUpdate(hostId, bookingId);
         booking.setGuestAccessPolicy(request.policy());
         return BookingResponse.from(booking);
     }
 
     @Transactional
     public void cancel(UUID hostId, UUID bookingId) {
-        Booking booking = findOwnedBooking(hostId, bookingId);
+        Booking booking = findOwnedBookingForUpdate(hostId, bookingId);
         booking.cancel();
         notificationService.cancelPendingForBooking(booking.getId());
     }
@@ -153,6 +153,11 @@ public class BookingService {
 
     private Booking findOwnedBooking(UUID hostId, UUID bookingId) {
         return bookingRepository.findByIdAndHostId(bookingId, hostId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+    }
+
+    private Booking findOwnedBookingForUpdate(UUID hostId, UUID bookingId) {
+        return bookingRepository.findForUpdateByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
     }
 
