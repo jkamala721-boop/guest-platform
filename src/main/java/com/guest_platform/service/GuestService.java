@@ -9,12 +9,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.guest_platform.dto.GuestCreateRequest;
 import com.guest_platform.dto.GuestListResponse;
+import com.guest_platform.dto.GuestRemovalResponse;
 import com.guest_platform.dto.GuestResponse;
 import com.guest_platform.dto.GuestUpdateRequest;
 import com.guest_platform.entity.Guest;
 import com.guest_platform.entity.Host;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.GuestRepository;
+import com.guest_platform.repository.BookingRepository;
 import com.guest_platform.repository.HostRepository;
 
 @Service
@@ -22,10 +24,12 @@ public class GuestService {
 
     private final HostRepository hostRepository;
     private final GuestRepository guestRepository;
+    private final BookingRepository bookingRepository;
 
-    public GuestService(HostRepository hostRepository, GuestRepository guestRepository) {
+    public GuestService(HostRepository hostRepository, GuestRepository guestRepository, BookingRepository bookingRepository) {
         this.hostRepository = hostRepository;
         this.guestRepository = guestRepository;
+        this.bookingRepository = bookingRepository;
     }
 
     @Transactional
@@ -59,7 +63,18 @@ public class GuestService {
 
     @Transactional
     public void delete(UUID hostId, UUID guestId) {
-        guestRepository.delete(findOwnedGuest(hostId, guestId));
+        remove(hostId, guestId);
+    }
+
+    @Transactional
+    public GuestRemovalResponse remove(UUID hostId, UUID guestId) {
+        Guest guest = findOwnedGuest(hostId, guestId);
+        if (bookingRepository.existsByGuestIdAndHostId(guestId, hostId)) {
+            guest.archive();
+            return new GuestRemovalResponse(true);
+        }
+        guestRepository.delete(guest);
+        return new GuestRemovalResponse(false);
     }
 
     private Host findActiveHost(UUID hostId) {

@@ -7,17 +7,17 @@ import org.springframework.stereotype.Component;
 
 import com.guest_platform.entity.Notification;
 import com.guest_platform.entity.NotificationChannel;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Component
+@ConditionalOnProperty(
+        name = "app.notifications.mode",
+        havingValue = "mock",
+        matchIfMissing = true
+)
 public class MockNotificationProvider implements NotificationProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MockNotificationProvider.class);
-
-    public MockNotificationProvider(@Value("${app.notifications.mode:mock}") String mode) {
-        if (!"mock".equalsIgnoreCase(mode)) {
-            throw new IllegalStateException("Only mock notifications are configured in Phase 6");
-        }
-    }
 
     @Override
     public NotificationChannel channel() {

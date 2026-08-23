@@ -17,6 +17,8 @@ import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
 
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
+
+    boolean existsByGuestIdAndHostId(UUID guestId, UUID hostId);
     List<Booking> findAllByHostIdOrderByCreatedAtDesc(UUID hostId);
     Optional<Booking> findByIdAndHostId(UUID id, UUID hostId);
 

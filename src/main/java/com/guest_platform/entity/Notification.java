@@ -14,12 +14,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "notifications", uniqueConstraints = {
-        @UniqueConstraint(name = "notifications_booking_type_key", columnNames = { "booking_id", "type" })
-})
+@Table(name = "notifications")
 public class Notification {
 
     @Id
@@ -61,6 +58,12 @@ public class Notification {
     @Column(name = "delivery_detail", length = 500)
     private String deliveryDetail;
 
+    @Column(length = 200)
+    private String subject;
+
+    @Column(length = 4000)
+    private String message;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -78,6 +81,12 @@ public class Notification {
         this.channel = channel;
         this.scheduledAt = scheduledAt;
         this.status = NotificationStatus.PENDING;
+    }
+
+    public Notification(Booking booking, NotificationChannel channel, String subject, String message, Instant scheduledAt) {
+        this(booking, NotificationType.MANUAL_MESSAGE, channel, scheduledAt);
+        this.subject = subject;
+        this.message = message;
     }
 
     @PrePersist
@@ -146,4 +155,6 @@ public class Notification {
     public String getDeliveryDetail() { return deliveryDetail; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public String getSubject() { return subject; }
+    public String getMessage() { return message; }
 }

@@ -1648,6 +1648,7 @@ async function renderBookingDetail(id) {
                   </div>
                   <button class="button secondary" data-copy-link type="button">Copy link</button>
                   <a class="button secondary" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Your Hostvero guest link: ${guestLinkUrl}`)}">Send via WhatsApp</a>
+                  <button class="button secondary" data-email-guest-link type="button">Send by email</button>
                 `
                 : `
                   <button
@@ -1673,6 +1674,8 @@ async function renderBookingDetail(id) {
                 `
                 : ''
             }
+
+            <button class="button secondary" data-send-notification type="button">Send notification</button>
 
           </div>
 
@@ -1869,6 +1872,22 @@ async function renderBookingDetail(id) {
       }
     });
 
+    $('[data-email-guest-link]')?.addEventListener('click', () => {
+      const token = guestLinkUrl ? guestLinkUrl.split('/').filter(Boolean).pop() : null;
+      if (!token) {
+        toast('Create or recover the secure guest link before sending it by email.', 'error');
+        return;
+      }
+      post(`/api/bookings/${id}/guest-link/email`, { token })
+        .then(notification => toast(
+          notification.status === 'SENT' ? 'Guest link email sent.' : 'Guest link email could not be delivered.',
+          notification.status === 'SENT' ? 'success' : 'error'
+        ))
+        .catch(error => toast(error.message, 'error'));
+    });
+
+    $('[data-send-notification]')?.addEventListener('click', () => openManualNotification(id));
+
 
     $('[data-initiate-payment]')
       ?.addEventListener(
@@ -1930,6 +1949,22 @@ async function renderBookingDetail(id) {
 }
 
 async function createGuestLink(bookingId) { try { const link = await post(`/api/bookings/${bookingId}/guest-link`, {}); const url = `${location.origin}/guest/${link.token}`; sessionStorage.setItem(`hostvero.guest-link.${bookingId}`, url); const modal = openModal({ title: 'Guest link created', body: `<p class="notice">Copy this link now. For security, Hostvero never retrieves it from a token hash later.</p><div class="field" style="margin-top:1rem"><label for="guest-link-value">Secure guest link</label><input id="guest-link-value" readonly value="${escapeHtml(url)}"></div>`, actions: `<button class="button" type="button" data-copy-link>Copy link</button><a class="button secondary" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Your Hostvero guest link: ${url}`)}">Send via WhatsApp</a>` }); $('[data-copy-link]', modal.root).addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Guest link copied.', 'success'); } catch { $('#guest-link-value', modal.root).select(); toast('Select and copy the link.', ''); } }); } catch (error) { toast(error.message, 'error'); } }
+
+function openManualNotification(bookingId) {
+  const modal = openModal({ title: 'Send notification', body: '<form id="manual-notification-form"><div class="field"><label for="notification-channel">Channel</label><select id="notification-channel" name="channel"><option value="EMAIL">Email</option></select></div><div class="field"><label for="notification-subject">Subject</label><input id="notification-subject" name="subject" maxlength="200" required></div><div class="field"><label for="notification-message">Message</label><textarea id="notification-message" name="message" maxlength="4000" required></textarea></div><div class="form-actions"><button class="button secondary" type="button" data-close>Cancel</button><button class="button" type="submit">Send</button></div></form>' });
+  $('[data-close]', modal.root).addEventListener('click', modal.close);
+  $('#manual-notification-form', modal.root).addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = $('button[type="submit"]', event.currentTarget);
+    setButtonBusy(button, true, 'Sending…');
+    try {
+      const result = await post(`/api/bookings/${bookingId}/notifications/manual`, Object.fromEntries(new FormData(event.currentTarget)));
+      modal.close();
+      toast(result.status === 'SENT' ? 'Notification sent.' : 'Notification could not be delivered.', result.status === 'SENT' ? 'success' : 'error');
+    } catch (error) { handleFormError(error, event.currentTarget); }
+    finally { setButtonBusy(button, false); }
+  });
+}
 
 async function openHostReceiptDocument(bookingId, download) {
   const receiptWindow = download ? null : window.open('', '_blank');
@@ -2234,7 +2269,7 @@ async function renderGuestForm(id) {
             type="button"
             data-delete-guest
           >
-            Delete guest
+            Remove guest
           </button>
 
           <a
@@ -2335,23 +2370,21 @@ async function renderGuestForm(id) {
 
           if (
             await confirmDialog({
-              title: 'Delete this guest?',
+              title: 'Remove this guest?',
               message:
-                'This will remove the guest record from the current Hostvero workspace.',
+                'Guests with booking history will be archived so historical records stay intact.',
               confirmLabel:
-                'Delete guest',
+                'Remove guest',
               danger: true
             })
           ) {
 
             try {
 
-              await del(
-                `/api/guests/${id}`
-              );
+              const result = await post(`/api/guests/${id}/remove`, {});
 
               toast(
-                'Guest deleted.',
+                result.archived ? 'Guest archived; booking history was preserved.' : 'Guest deleted.',
                 'success'
               );
 

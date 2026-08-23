@@ -54,6 +54,9 @@ public class Guest {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
     protected Guest() {
     }
 
@@ -99,4 +102,9 @@ public class Guest {
     public String getNotes() { return notes; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public boolean isActive() { return active; }
+
+    public void archive() {
+        active = false;
+    }
 }

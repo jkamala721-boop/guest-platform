@@ -5,22 +5,30 @@ import java.util.UUID;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.guest_platform.dto.NotificationResponse;
+import com.guest_platform.dto.ManualNotificationRequest;
+import com.guest_platform.dto.GuestLinkEmailRequest;
 import com.guest_platform.security.CurrentHost;
+import com.guest_platform.service.GuestLinkEmailService;
 import com.guest_platform.service.NotificationService;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final GuestLinkEmailService guestLinkEmailService;
 
-    public NotificationController(NotificationService notificationService) {
+    public NotificationController(NotificationService notificationService, GuestLinkEmailService guestLinkEmailService) {
         this.notificationService = notificationService;
+        this.guestLinkEmailService = guestLinkEmailService;
     }
 
     @GetMapping("/api/notifications")
@@ -36,5 +44,17 @@ public class NotificationController {
     @GetMapping("/api/bookings/{bookingId}/notifications")
     public List<NotificationResponse> listForBooking(Authentication authentication, @PathVariable UUID bookingId) {
         return notificationService.listForBooking(CurrentHost.id(authentication), bookingId);
+    }
+
+    @PostMapping("/api/bookings/{bookingId}/notifications/manual")
+    public NotificationResponse sendManual(Authentication authentication, @PathVariable UUID bookingId,
+            @Valid @RequestBody ManualNotificationRequest request) {
+        return notificationService.sendManual(CurrentHost.id(authentication), bookingId, request);
+    }
+
+    @PostMapping("/api/bookings/{bookingId}/guest-link/email")
+    public NotificationResponse sendGuestLinkEmail(Authentication authentication, @PathVariable UUID bookingId,
+            @Valid @RequestBody GuestLinkEmailRequest request) {
+        return guestLinkEmailService.send(CurrentHost.id(authentication), bookingId, request);
     }
 }

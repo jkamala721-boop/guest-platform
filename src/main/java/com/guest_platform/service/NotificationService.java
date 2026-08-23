@@ -11,10 +11,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.guest_platform.dto.NotificationResponse;
+import com.guest_platform.dto.ManualNotificationRequest;
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
 import com.guest_platform.entity.Notification;
@@ -22,12 +25,15 @@ import com.guest_platform.entity.NotificationChannel;
 import com.guest_platform.entity.NotificationStatus;
 import com.guest_platform.entity.NotificationType;
 import com.guest_platform.exception.ResourceNotFoundException;
+import com.guest_platform.exception.ConflictException;
 import com.guest_platform.repository.BookingRepository;
 import com.guest_platform.repository.NotificationRepository;
 import com.guest_platform.service.notification.NotificationProvider;
 
 @Service
 public class NotificationService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(NotificationService.class);
 
     private static final EnumSet<BookingStatus> UPCOMING_STATUSES = EnumSet.of(
             BookingStatus.PENDING_CONFIRMATION, BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED);
@@ -38,21 +44,58 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final AvailabilityService availabilityService;
     private final Map<NotificationChannel, NotificationProvider> providers;
+    private final NotificationChannel notificationChannel;
     private final long paymentReminderHoursBeforeCheckIn;
 
-    public NotificationService(BookingRepository bookingRepository, NotificationRepository notificationRepository,
-            AvailabilityService availabilityService, List<NotificationProvider> notificationProviders,
-            @Value("${app.notifications.payment-reminder-hours-before-checkin:12}")
-            long paymentReminderHoursBeforeCheckIn) {
-        if (paymentReminderHoursBeforeCheckIn < 1 || paymentReminderHoursBeforeCheckIn > 47) {
-            throw new IllegalArgumentException("payment reminder hours must be between 1 and 47");
+
+    public NotificationService(
+        BookingRepository bookingRepository,
+        NotificationRepository notificationRepository,
+        AvailabilityService availabilityService,
+        List<NotificationProvider> notificationProviders,
+        @Value("${app.notifications.mode:mock}") String notificationMode,
+        @Value("${app.notifications.payment-reminder-hours-before-checkin:12}")
+        long paymentReminderHoursBeforeCheckIn) {
+
+    if (paymentReminderHoursBeforeCheckIn < 1 || paymentReminderHoursBeforeCheckIn > 47) {
+        throw new IllegalArgumentException("payment reminder hours must be between 1 and 47");
+    }
+
+    this.bookingRepository = bookingRepository;
+    this.notificationRepository = notificationRepository;
+    this.availabilityService = availabilityService;
+
+    this.providers = notificationProviders.stream()
+            .collect(Collectors.toMap(
+                    NotificationProvider::channel,
+                    Function.identity(),
+                    (first, ignored) -> first,
+                    () -> new EnumMap<>(NotificationChannel.class)));
+
+    this.notificationChannel = "email".equalsIgnoreCase(notificationMode)
+            ? NotificationChannel.EMAIL
+            : NotificationChannel.MOCK;
+
+    this.paymentReminderHoursBeforeCheckIn = paymentReminderHoursBeforeCheckIn;
+}
+
+    @Transactional
+    public NotificationResponse sendManual(UUID hostId, UUID bookingId, ManualNotificationRequest request) {
+        Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        return sendManual(booking, request.channel(), request.subject().trim(), request.message().trim());
+    }
+
+    private NotificationResponse sendManual(Booking booking, NotificationChannel channel, String subject, String message) {
+        if (booking.getGuest() == null || booking.getGuest().getEmail() == null || booking.getGuest().getEmail().isBlank()) {
+            throw new ConflictException("A guest email is required before sending a notification");
         }
-        this.bookingRepository = bookingRepository;
-        this.notificationRepository = notificationRepository;
-        this.availabilityService = availabilityService;
-        this.providers = notificationProviders.stream().collect(Collectors.toMap(NotificationProvider::channel,
-                Function.identity(), (first, ignored) -> first, () -> new EnumMap<>(NotificationChannel.class)));
-        this.paymentReminderHoursBeforeCheckIn = paymentReminderHoursBeforeCheckIn;
+        if (channel != notificationChannel || !providers.containsKey(channel)) {
+            throw new ConflictException("That notification channel is not configured");
+        }
+        Notification notification = notificationRepository.save(new Notification(booking, channel, subject, message, Instant.now()));
+        deliverDueNotification(notification.getId(), Instant.now());
+        return NotificationResponse.from(notification);
     }
 
     @Transactional
@@ -154,7 +197,7 @@ public class NotificationService {
         }
         Instant scheduledAt = triggerAt.isAfter(now) ? triggerAt : now;
         if (notification == null) {
-            notificationRepository.save(new Notification(booking, type, NotificationChannel.MOCK, scheduledAt));
+            notificationRepository.save(new Notification(booking, type, notificationChannel, scheduledAt));
         } else {
             notification.refreshRecipient(booking.getGuest());
             notification.reschedule(scheduledAt);
@@ -189,8 +232,25 @@ public class NotificationService {
             notification.markSent(now, extensionAvailable, deliveryDetail(notification.getType()));
         } catch (RuntimeException exception) {
             // Do not retain arbitrary provider exception text because it can contain sensitive data.
+            LOGGER.warn("Notification delivery failed: notificationId={}, channel={}, exceptionClass={}, message={}",
+                    notification.getId(), notification.getChannel(), exception.getClass().getSimpleName(),
+                    safeExceptionMessage(exception));
             notification.markFailed("Delivery failed");
         }
+    }
+
+    private String safeExceptionMessage(RuntimeException exception) {
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return "(no message)";
+        }
+        String safeMessage = message.replaceAll("(?i)bearer\\s+[^\\s,;]+", "Bearer [redacted]")
+                .replaceAll("(?i)(api[-_ ]?key|authorization|token|secret|password)\\s*[:=]\\s*[^\\s,;]+",
+                        "$1=[redacted]")
+                .replaceAll("(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}", "[redacted-email]")
+                .replaceAll("[\\r\\n\\t]+", " ")
+                .trim();
+        return safeMessage.substring(0, Math.min(safeMessage.length(), 300));
     }
 
     private boolean isRelevantAtDelivery(Notification notification, Instant now) {
@@ -204,6 +264,7 @@ public class NotificationService {
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER -> requiresPayment(booking, checkInAt, now);
             case CHECKOUT_REMINDER -> (booking.getStatus() == BookingStatus.CONFIRMED
                     || booking.getStatus() == BookingStatus.CHECKED_IN) && checkOutAt.isAfter(now);
+            case MANUAL_MESSAGE -> true;
         };
     }
 
@@ -223,6 +284,7 @@ public class NotificationService {
         return switch (type) {
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER ->
                     "Mock delivery completed; guest link action is required";
+            case MANUAL_MESSAGE -> "Manual notification delivered";
             default -> "Mock delivery completed";
         };
     }

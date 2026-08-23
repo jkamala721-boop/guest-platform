@@ -17,6 +17,7 @@ public interface GuestRepository extends JpaRepository<Guest, UUID> {
     @Query("""
             select guest from Guest guest
             where guest.host.id = :hostId
+              and guest.active = true
               and (coalesce(:query, '') = '' or lower(guest.fullName) like lower(concat('%', :query, '%'))
                    or lower(guest.email) like lower(concat('%', :query, '%'))
                    or guest.phone like concat('%', :query, '%'))

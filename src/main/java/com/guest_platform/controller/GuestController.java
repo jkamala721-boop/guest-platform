@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.guest_platform.dto.GuestCreateRequest;
 import com.guest_platform.dto.GuestListResponse;
+import com.guest_platform.dto.GuestRemovalResponse;
 import com.guest_platform.dto.GuestResponse;
 import com.guest_platform.dto.GuestUpdateRequest;
 import com.guest_platform.security.CurrentHost;
@@ -65,5 +66,10 @@ public class GuestController {
     public ResponseEntity<Void> delete(Authentication authentication, @PathVariable UUID guestId) {
         guestService.delete(CurrentHost.id(authentication), guestId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{guestId}/remove")
+    public GuestRemovalResponse remove(Authentication authentication, @PathVariable UUID guestId) {
+        return guestService.remove(CurrentHost.id(authentication), guestId);
     }
 }
