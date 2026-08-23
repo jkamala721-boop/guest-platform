@@ -11,24 +11,19 @@ import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.core.exception.ResendException;
 
 @Component
-@ConditionalOnProperty(
-        name = "app.notifications.mode",
-        havingValue = "email"
-)
+@ConditionalOnProperty(name = "app.notifications.resend.enabled", havingValue = "true", matchIfMissing = true)
 public class ResendNotificationProvider implements NotificationProvider {
 
     private final Resend resend;
+    private final String apiKey;
     private final String fromAddress;
 
     public ResendNotificationProvider(
             @Value("${app.notifications.resend.api-key}") String apiKey,
             @Value("${app.notifications.resend.from:onboarding@resend.dev}") String fromAddress) {
 
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("Resend API key is not configured");
-        }
-
-        this.resend = new Resend(apiKey);
+        this.apiKey = apiKey;
+        this.resend = apiKey == null || apiKey.isBlank() ? null : new Resend(apiKey);
         this.fromAddress = fromAddress;
     }
 
@@ -38,7 +33,22 @@ public class ResendNotificationProvider implements NotificationProvider {
     }
 
     @Override
+    public String readinessError(Notification notification) {
+        if (apiKeyMissing()) {
+            return "Email delivery is not configured";
+        }
+        if (notification.getGuest().getEmail() == null || notification.getGuest().getEmail().isBlank()) {
+            return "A guest email is required before sending an email notification";
+        }
+        return null;
+    }
+
+    @Override
     public void deliver(Notification notification) {
+        String readinessError = readinessError(notification);
+        if (readinessError != null) {
+            throw new IllegalStateException(readinessError);
+        }
         String recipient = notification.getGuest().getEmail();
 
         if (recipient == null || recipient.isBlank()) {
@@ -99,6 +109,7 @@ public class ResendNotificationProvider implements NotificationProvider {
             case CHECKOUT_REMINDER ->
                     "Hostvero checkout reminder";
             case MANUAL_MESSAGE -> notification.getSubject();
+            case GUEST_LINK -> "Your Hostvero stay link";
         };
     }
 
@@ -139,7 +150,27 @@ public class ResendNotificationProvider implements NotificationProvider {
                     <p>%s</p>
                     <p>Hostvero</p>
                     """.formatted(guestName, escapeHtml(notification.getMessage()).replace("\n", "<br>"));
+            case GUEST_LINK -> """
+                    <p>Hello %s,</p>
+                    <p>Your stay at %s is from %s to %s.</p>
+                    <p>Your secure Hostvero guest link:</p>
+                    <p><a href="%s">Open your guest link</a></p>
+                    <p>Please do not share this link publicly.</p>
+                    <p>Hostvero</p>
+                    """.formatted(guestName, escapeHtml(parameter(notification, 1)), escapeHtml(parameter(notification, 2)),
+                            escapeHtml(parameter(notification, 3)), escapeHtml(parameter(notification, 4)));
         };
+    }
+
+    private boolean apiKeyMissing() {
+        return apiKey == null || apiKey.isBlank();
+    }
+
+    private String parameter(Notification notification, int index) {
+        if (notification.getDeliveryParameters().size() <= index) {
+            throw new IllegalStateException("Secure guest link delivery data is unavailable");
+        }
+        return notification.getDeliveryParameters().get(index);
     }
 
     private String escapeHtml(String value) {

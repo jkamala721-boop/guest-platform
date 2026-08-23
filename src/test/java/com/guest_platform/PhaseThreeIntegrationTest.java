@@ -102,6 +102,31 @@ class PhaseThreeIntegrationTest {
     }
 
     @Test
+    void bookingCreationKeepsGuestlessBookingsAndAttachesOnlyOwnedSuppliedGuests() throws Exception {
+        String ownerToken = register("phase3-guest-attachment-owner@example.com", "Booking Guest Owner");
+        String propertyId = createProperty(ownerToken, "Guest Attachment Property");
+        String guestId = createGuest(ownerToken, "Attached Guest");
+        LocalDate checkIn = LocalDate.now().plusDays(70);
+
+        Map<String, Object> guestlessPayload = bookingPayload(propertyId, null, checkIn, checkIn.plusDays(2), "DRAFT");
+        mockMvc.perform(post("/api/bookings").header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(guestlessPayload)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.guestId").isEmpty());
+
+        mockMvc.perform(post("/api/bookings").header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(
+                                bookingPayload(propertyId, guestId, checkIn.plusDays(3), checkIn.plusDays(5), "DRAFT"))))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.guestId").value(guestId));
+
+        String otherToken = register("phase3-guest-attachment-other@example.com", "Other Guest Owner");
+        String otherGuestId = createGuest(otherToken, "Other Host Guest");
+        mockMvc.perform(post("/api/bookings").header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(
+                                bookingPayload(propertyId, otherGuestId, checkIn.plusDays(6), checkIn.plusDays(8), "DRAFT"))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void bookingAndAvailabilityEndpointsAreTenantIsolated() throws Exception {
         String ownerToken = register("phase3-owner@example.com", "Booking Owner");
         String ownerPropertyId = createProperty(ownerToken, "Owner Property");

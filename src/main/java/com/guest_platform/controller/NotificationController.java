@@ -16,6 +16,7 @@ import com.guest_platform.dto.ManualNotificationRequest;
 import com.guest_platform.dto.GuestLinkEmailRequest;
 import com.guest_platform.security.CurrentHost;
 import com.guest_platform.service.GuestLinkEmailService;
+import com.guest_platform.service.GuestLinkWhatsAppService;
 import com.guest_platform.service.NotificationService;
 import jakarta.validation.Valid;
 
@@ -25,10 +26,13 @@ public class NotificationController {
 
     private final NotificationService notificationService;
     private final GuestLinkEmailService guestLinkEmailService;
+    private final GuestLinkWhatsAppService guestLinkWhatsAppService;
 
-    public NotificationController(NotificationService notificationService, GuestLinkEmailService guestLinkEmailService) {
+    public NotificationController(NotificationService notificationService, GuestLinkEmailService guestLinkEmailService,
+            GuestLinkWhatsAppService guestLinkWhatsAppService) {
         this.notificationService = notificationService;
         this.guestLinkEmailService = guestLinkEmailService;
+        this.guestLinkWhatsAppService = guestLinkWhatsAppService;
     }
 
     @GetMapping("/api/notifications")
@@ -56,5 +60,11 @@ public class NotificationController {
     public NotificationResponse sendGuestLinkEmail(Authentication authentication, @PathVariable UUID bookingId,
             @Valid @RequestBody GuestLinkEmailRequest request) {
         return guestLinkEmailService.send(CurrentHost.id(authentication), bookingId, request);
+    }
+
+    @PostMapping("/api/bookings/{bookingId}/guest-link/whatsapp")
+    public NotificationResponse sendGuestLinkWhatsApp(Authentication authentication, @PathVariable UUID bookingId,
+            @Valid @RequestBody GuestLinkEmailRequest request) {
+        return guestLinkWhatsAppService.send(CurrentHost.id(authentication), bookingId, request);
     }
 }

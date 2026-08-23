@@ -5,6 +5,7 @@ import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -53,7 +54,7 @@ public class NotificationService {
         NotificationRepository notificationRepository,
         AvailabilityService availabilityService,
         List<NotificationProvider> notificationProviders,
-        @Value("${app.notifications.mode:mock}") String notificationMode,
+        @Value("${app.notifications.default-channel:${app.notifications.mode:mock}}") String defaultChannel,
         @Value("${app.notifications.payment-reminder-hours-before-checkin:12}")
         long paymentReminderHoursBeforeCheckIn) {
 
@@ -72,9 +73,11 @@ public class NotificationService {
                     (first, ignored) -> first,
                     () -> new EnumMap<>(NotificationChannel.class)));
 
-    this.notificationChannel = "email".equalsIgnoreCase(notificationMode)
-            ? NotificationChannel.EMAIL
-            : NotificationChannel.MOCK;
+    try {
+        this.notificationChannel = NotificationChannel.valueOf(defaultChannel.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException exception) {
+        throw new IllegalArgumentException("Notification default channel is invalid");
+    }
 
     this.paymentReminderHoursBeforeCheckIn = paymentReminderHoursBeforeCheckIn;
 }
@@ -83,17 +86,35 @@ public class NotificationService {
     public NotificationResponse sendManual(UUID hostId, UUID bookingId, ManualNotificationRequest request) {
         Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
-        return sendManual(booking, request.channel(), request.subject().trim(), request.message().trim());
+        return send(booking, NotificationType.MANUAL_MESSAGE, request.channel(), request.subject().trim(),
+                request.message().trim(), List.of());
     }
 
-    private NotificationResponse sendManual(Booking booking, NotificationChannel channel, String subject, String message) {
-        if (booking.getGuest() == null || booking.getGuest().getEmail() == null || booking.getGuest().getEmail().isBlank()) {
-            throw new ConflictException("A guest email is required before sending a notification");
+    @Transactional
+    public NotificationResponse sendGuestLink(UUID hostId, UUID bookingId, NotificationChannel channel,
+            List<String> deliveryParameters) {
+        Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        return send(booking, NotificationType.GUEST_LINK, channel, "Your Hostvero stay link",
+                "Secure guest link delivery", deliveryParameters);
+    }
+
+    private NotificationResponse send(Booking booking, NotificationType type, NotificationChannel channel, String subject,
+            String message, List<String> deliveryParameters) {
+        if (booking.getGuest() == null) {
+            throw new ConflictException("A guest is required before sending a notification");
         }
-        if (channel != notificationChannel || !providers.containsKey(channel)) {
+        NotificationProvider provider = providers.get(channel);
+        if (provider == null) {
             throw new ConflictException("That notification channel is not configured");
         }
-        Notification notification = notificationRepository.save(new Notification(booking, channel, subject, message, Instant.now()));
+        Notification notification = new Notification(booking, type, channel, subject, message, Instant.now());
+        notification.setDeliveryParameters(deliveryParameters);
+        String readinessError = provider.readinessError(notification);
+        if (readinessError != null) {
+            throw new ConflictException(readinessError);
+        }
+        notification = notificationRepository.save(notification);
         deliverDueNotification(notification.getId(), Instant.now());
         return NotificationResponse.from(notification);
     }
@@ -264,7 +285,7 @@ public class NotificationService {
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER -> requiresPayment(booking, checkInAt, now);
             case CHECKOUT_REMINDER -> (booking.getStatus() == BookingStatus.CONFIRMED
                     || booking.getStatus() == BookingStatus.CHECKED_IN) && checkOutAt.isAfter(now);
-            case MANUAL_MESSAGE -> true;
+            case MANUAL_MESSAGE, GUEST_LINK -> true;
         };
     }
 
@@ -285,6 +306,7 @@ public class NotificationService {
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER ->
                     "Mock delivery completed; guest link action is required";
             case MANUAL_MESSAGE -> "Manual notification delivered";
+            case GUEST_LINK -> "Guest link notification delivered";
             default -> "Mock delivery completed";
         };
     }

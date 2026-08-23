@@ -1,6 +1,7 @@
 package com.guest_platform.entity;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -14,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "notifications")
@@ -64,6 +66,13 @@ public class Notification {
     @Column(length = 4000)
     private String message;
 
+    /**
+     * One-time provider parameters, such as a raw secure-link URL. They are
+     * intentionally never persisted.
+     */
+    @Transient
+    private List<String> deliveryParameters = List.of();
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -85,6 +94,13 @@ public class Notification {
 
     public Notification(Booking booking, NotificationChannel channel, String subject, String message, Instant scheduledAt) {
         this(booking, NotificationType.MANUAL_MESSAGE, channel, scheduledAt);
+        this.subject = subject;
+        this.message = message;
+    }
+
+    public Notification(Booking booking, NotificationType type, NotificationChannel channel, String subject,
+            String message, Instant scheduledAt) {
+        this(booking, type, channel, scheduledAt);
         this.subject = subject;
         this.message = message;
     }
@@ -157,4 +173,8 @@ public class Notification {
     public Instant getUpdatedAt() { return updatedAt; }
     public String getSubject() { return subject; }
     public String getMessage() { return message; }
+    public List<String> getDeliveryParameters() { return deliveryParameters; }
+    public void setDeliveryParameters(List<String> deliveryParameters) {
+        this.deliveryParameters = deliveryParameters == null ? List.of() : List.copyOf(deliveryParameters);
+    }
 }

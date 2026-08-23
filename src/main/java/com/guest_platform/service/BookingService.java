@@ -12,11 +12,13 @@ import com.guest_platform.dto.BookingResponse;
 import com.guest_platform.dto.BookingUpdateRequest;
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
+import com.guest_platform.entity.Guest;
 import com.guest_platform.entity.Host;
 import com.guest_platform.entity.Property;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.BookingRepository;
 import com.guest_platform.repository.HostRepository;
+import com.guest_platform.repository.GuestRepository;
 import com.guest_platform.repository.PropertyRepository;
 
 @Service
@@ -24,15 +26,17 @@ public class BookingService {
 
     private final HostRepository hostRepository;
     private final PropertyRepository propertyRepository;
+    private final GuestRepository guestRepository;
     private final BookingRepository bookingRepository;
     private final AvailabilityService availabilityService;
     private final NotificationService notificationService;
 
     public BookingService(HostRepository hostRepository, PropertyRepository propertyRepository,
-            BookingRepository bookingRepository,
+            GuestRepository guestRepository, BookingRepository bookingRepository,
             AvailabilityService availabilityService, NotificationService notificationService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
+        this.guestRepository = guestRepository;
         this.bookingRepository = bookingRepository;
         this.availabilityService = availabilityService;
         this.notificationService = notificationService;
@@ -65,6 +69,11 @@ public class BookingService {
         );
 
         Booking booking = new Booking(host, property);
+        if (request.guestId() != null) {
+            Guest guest = guestRepository.findByIdAndHostId(request.guestId(), hostId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Guest was not found"));
+            booking.assignGuest(guest);
+        }
 
         apply(
                 booking,
