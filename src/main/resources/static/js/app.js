@@ -1443,6 +1443,8 @@ async function renderBookingDetail(id) {
       `)
       .join('');
 
+    const hasSucceededPayment = payments.some(payment => payment.status === 'SUCCEEDED');
+
 
     const notificationRows = notifications
       .map(notification => `
@@ -1541,13 +1543,19 @@ async function renderBookingDetail(id) {
             Edit booking
           </button>
 
-          <button
-            class="button secondary"
-            data-cancel-booking
-            type="button"
-          >
-            Cancel
-          </button>
+          ${
+            hasSucceededPayment
+              ? '<span class="muted">Paid bookings cannot be cancelled here.</span>'
+              : `
+                <button
+                  class="button secondary"
+                  data-cancel-booking
+                  type="button"
+                >
+                  Cancel
+                </button>
+              `
+          }
 
         </div>
 
@@ -1673,7 +1681,7 @@ async function renderBookingDetail(id) {
             }
 
             ${
-              booking.status === 'PENDING_PAYMENT'
+              booking.status === 'PENDING_PAYMENT' && !hasSucceededPayment
                 ? `
                   <button
                     class="button"
@@ -1681,6 +1689,13 @@ async function renderBookingDetail(id) {
                     type="button"
                   >
                     Initiate payment
+                  </button>
+                  <button
+                    class="button secondary"
+                    data-confirm-cash-payment
+                    type="button"
+                  >
+                    Confirm cash payment
                   </button>
                 `
                 : ''
@@ -1824,7 +1839,7 @@ async function renderBookingDetail(id) {
     );
 
 
-    $('[data-cancel-booking]').addEventListener(
+    $('[data-cancel-booking]')?.addEventListener(
       'click',
       async () => {
 
@@ -1922,6 +1937,22 @@ async function renderBookingDetail(id) {
             'Payment initiated. Complete verification through the configured provider callback.'
           )
       );
+
+    $('[data-confirm-cash-payment]')?.addEventListener('click', async () => {
+      if (!await confirmDialog({
+        title: 'Confirm cash payment?',
+        message: 'Confirm that you have received the full booking amount in cash?',
+        confirmLabel: 'Confirm cash payment'
+      })) return;
+
+      try {
+        await post(`/api/bookings/${id}/payments/cash/confirm`, {});
+        toast('Cash payment confirmed.', 'success');
+        renderBookingDetail(id);
+      } catch (error) {
+        toast(error.message, 'error');
+      }
+    });
 
     $('[data-view-receipt]')?.addEventListener('click', () => {
       openHostReceiptDocument(id, false).catch(error => toast(error.message, 'error'));

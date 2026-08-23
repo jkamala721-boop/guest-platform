@@ -38,6 +38,12 @@ public class PaymentController {
                 .body(paymentService.initiate(CurrentHost.id(authentication), bookingId, request));
     }
 
+    @PostMapping("/api/bookings/{bookingId}/payments/cash/confirm")
+    public ResponseEntity<PaymentResponse> confirmCashPayment(Authentication authentication, @PathVariable UUID bookingId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(paymentService.confirmCashPayment(CurrentHost.id(authentication), bookingId));
+    }
+
     @GetMapping("/api/bookings/{bookingId}/payments")
     public List<PaymentResponse> listForBooking(Authentication authentication, @PathVariable UUID bookingId) {
         return paymentService.listForBooking(CurrentHost.id(authentication), bookingId);

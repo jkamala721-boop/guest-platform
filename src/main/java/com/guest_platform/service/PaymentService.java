@@ -114,6 +114,31 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment was not found")));
     }
 
+    /** A host-only trusted completion path for a cash payment. */
+    @Transactional
+    public PaymentResponse confirmCashPayment(UUID hostId, UUID bookingId) {
+        Booking booking = bookingRepository.findForUpdateByIdAndHostId(bookingId, hostId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ConflictException("Cancelled bookings cannot be paid.");
+        }
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+            throw new ConflictException("Booking is not awaiting payment");
+        }
+        if (paymentRepository.existsByBookingIdAndStatus(booking.getId(), PaymentStatus.SUCCEEDED)) {
+            throw new ConflictException("Booking already has a successful payment.");
+        }
+        if (hasInProgressPayment(booking, null)) {
+            throw new ConflictException("A payment is already in progress");
+        }
+
+        String reference = "CASH-" + UUID.randomUUID();
+        Payment payment = paymentRepository.saveAndFlush(new Payment(booking.getHost(), booking,
+                PaymentProvider.CASH, reference, booking.getTotalAmount(), booking.getCurrency()));
+        completeVerifiedPayment(payment, "CASH-CONFIRMATION-" + payment.getId());
+        return PaymentResponse.from(payment);
+    }
+
     @Transactional
     public PaymentResponse processVerifiedWebhook(PaymentProvider provider, PaymentWebhookRequest request) {
         String providerReference = requireValue(request.providerReference(), "providerReference");
@@ -179,11 +204,17 @@ public class PaymentService {
 
     /** Shared, transactional completion path for every verified provider success. */
     private void completeVerifiedPayment(Payment payment, String eventId) {
-        if (!payment.markSucceeded(eventId)) {
+        if (payment.getStatus() == PaymentStatus.SUCCEEDED) {
             return;
         }
         Booking booking = bookingRepository.findForUpdateById(payment.getBooking().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        if (payment.getBookingExtension() == null && booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+            return;
+        }
+        if (!payment.markSucceeded(eventId)) {
+            return;
+        }
         if (payment.getBookingExtension() != null) {
             if (!bookingExtensionService.applyPaidExtension(payment.getBookingExtension())) {
                 throw new ConflictException("Booking extension is no longer available");

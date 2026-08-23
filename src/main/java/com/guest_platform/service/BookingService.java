@@ -20,7 +20,10 @@ import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.BookingRepository;
 import com.guest_platform.repository.HostRepository;
 import com.guest_platform.repository.GuestRepository;
+import com.guest_platform.repository.PaymentRepository;
 import com.guest_platform.repository.PropertyRepository;
+import com.guest_platform.entity.PaymentStatus;
+import com.guest_platform.exception.ConflictException;
 
 @Service
 public class BookingService {
@@ -31,16 +34,21 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final AvailabilityService availabilityService;
     private final NotificationService notificationService;
+    private final PaymentRepository paymentRepository;
+    private final GuestLinkService guestLinkService;
 
     public BookingService(HostRepository hostRepository, PropertyRepository propertyRepository,
             GuestRepository guestRepository, BookingRepository bookingRepository,
-            AvailabilityService availabilityService, NotificationService notificationService) {
+            AvailabilityService availabilityService, NotificationService notificationService,
+            PaymentRepository paymentRepository, GuestLinkService guestLinkService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
         this.guestRepository = guestRepository;
         this.bookingRepository = bookingRepository;
         this.availabilityService = availabilityService;
         this.notificationService = notificationService;
+        this.paymentRepository = paymentRepository;
+        this.guestLinkService = guestLinkService;
     }
 
     @Transactional
@@ -135,7 +143,11 @@ public class BookingService {
     @Transactional
     public void cancel(UUID hostId, UUID bookingId) {
         Booking booking = findOwnedBookingForUpdate(hostId, bookingId);
+        if (paymentRepository.existsByBookingIdAndStatus(booking.getId(), PaymentStatus.SUCCEEDED)) {
+            throw new ConflictException("Paid bookings cannot be cancelled through this action.");
+        }
         booking.cancel();
+        guestLinkService.revokeUsableLinksForCancelledBooking(booking);
         notificationService.cancelPendingForBooking(booking.getId());
     }
 

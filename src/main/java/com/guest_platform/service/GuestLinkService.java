@@ -65,6 +65,9 @@ public class GuestLinkService {
     public GuestLinkCreateResponse rotate(UUID hostId, UUID bookingId) {
         Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ConflictException("A guest link cannot be created for a cancelled booking");
+        }
         Instant now = Instant.now();
         boolean hasActiveStayLink = guestLinkRepository
                 .findAllByBookingIdAndState(booking.getId(), GuestLinkState.STAY_ACTIVE).stream()
@@ -175,11 +178,20 @@ public class GuestLinkService {
                 .forEach(GuestLink::activate);
     }
 
+    /** Keeps cancelled booking links auditable while invalidating usable public links. */
+    @Transactional
+    public void revokeUsableLinksForCancelledBooking(Booking booking) {
+        guestLinkRepository.findAllByBookingId(booking.getId()).stream()
+                .filter(link -> link.getState() == GuestLinkState.REGISTRATION_OR_PAYMENT
+                        || link.getState() == GuestLinkState.STAY_ACTIVE)
+                .forEach(GuestLink::revoke);
+    }
+
     @Transactional
     public GuestLink resolveUsableGuestLink(String token) {
         GuestLink guestLink = guestLinkRepository.findByTokenHash(hash(token))
                 .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
-        if (!guestLink.isUsableAt(Instant.now())) {
+        if (guestLink.getBooking().getStatus() == BookingStatus.CANCELLED || !guestLink.isUsableAt(Instant.now())) {
             if (guestLink.getRevokedAt() == null && guestLink.getState() != GuestLinkState.EXPIRED) {
                 guestLink.expire();
             }

@@ -177,10 +177,12 @@ class PhaseFiveIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(webhookPayload(cancelledReference, "phase5-late-success", true, null)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/public/guest/{token}", cancelledGuestToken))
+        mockMvc.perform(get("/api/bookings/{bookingId}", cancelledBookingId)
+                        .header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.state").value("REGISTRATION_OR_PAYMENT"))
-                .andExpect(jsonPath("$.property.wifiPassword").doesNotExist());
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+        mockMvc.perform(get("/api/public/guest/{token}", cancelledGuestToken))
+                .andExpect(status().isNotFound());
     }
 
     @Test

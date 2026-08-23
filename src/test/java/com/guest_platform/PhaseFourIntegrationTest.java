@@ -151,6 +151,8 @@ class PhaseFourIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
                         .string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment;")));
+        mockMvc.perform(delete("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isConflict());
 
         mockMvc.perform(post("/api/webhooks/stripe")
                         .header("Stripe-Signature", stripeSignature(payload))
@@ -243,6 +245,65 @@ class PhaseFourIntegrationTest {
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/bookings/{bookingId}", cancelledBookingId).header("Authorization", bearer(token)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        mockMvc.perform(get("/api/payments/{paymentId}", cancelledPaymentId).header("Authorization", bearer(token)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"));
+    }
+
+    @Test
+    void cancellingAnUnpaidBookingRevokesItsGuestLinkAcrossPublicEndpoints() throws Exception {
+        String token = register("phase4-cancel-owner@example.com", "Cancel Owner");
+        String propertyId = createProperty(token, "Cancellation Property");
+        String guestId = createGuest(token, "Cancellation Guest");
+        String bookingId = createBooking(token, propertyId, guestId, LocalDate.now().plusDays(105),
+                LocalDate.now().plusDays(107), "PENDING_PAYMENT", new BigDecimal("220.00"));
+        String guestToken = createGuestLink(token, bookingId);
+
+        mockMvc.perform(delete("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(token)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/bookings/{bookingId}/guest-link", bookingId).header("Authorization", bearer(token)))
+                .andExpect(status().isConflict());
+        mockMvc.perform(get("/api/public/guest/{token}", guestToken)).andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/public/guest/{token}/payments", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"STRIPE\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/public/guest/{token}/email-verification/confirm", guestToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"123456\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/public/guest/{token}/receipt", guestToken)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void hostCanConfirmCashPaymentExactlyOnceAndPaidBookingsCannotBeCancelled() throws Exception {
+        String ownerToken = register("phase4-cash-owner@example.com", "Cash Owner");
+        String otherToken = register("phase4-cash-other@example.com", "Cash Other Host");
+        String propertyId = createProperty(ownerToken, "Cash Property");
+        String guestId = createGuest(ownerToken, "Cash Guest");
+        String bookingId = createBooking(ownerToken, propertyId, guestId, LocalDate.now().plusDays(110),
+                LocalDate.now().plusDays(112), "PENDING_PAYMENT", new BigDecimal("375.00"));
+        String guestToken = createGuestLink(ownerToken, bookingId);
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/payments/cash/confirm", bookingId)
+                        .header("Authorization", bearer(otherToken)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/bookings/{bookingId}/payments/cash/confirm", bookingId)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.provider").value("CASH"))
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.amount").value(375.00))
+                .andExpect(jsonPath("$.currency").value("KES"));
+        mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
+        mockMvc.perform(get("/api/bookings/{bookingId}/receipt", bookingId).header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/public/guest/{token}", guestToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.state").value("STAY_ACTIVE"));
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/payments/cash/confirm", bookingId)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isConflict());
+        mockMvc.perform(delete("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isConflict());
     }
 
     private String register(String email, String fullName) throws Exception {
