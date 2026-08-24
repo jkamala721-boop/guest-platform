@@ -35,3 +35,5 @@ build/
 .env.*
 !.env.example
 application-local.properties
+backups/
+*.dump

@@ -21,7 +21,7 @@ Do not set a separate Render build or start command for this Docker service. Ren
 2. Use the production branch and either create from `render.yaml` or configure the matching variables below.
 3. Set `SPRING_PROFILES_ACTIVE=prod`; the image also defaults to this profile.
 4. Configure the Supabase JDBC URL, username, and password in Render's secret store.
-5. Set `HOSTVERO_PUBLIC_BASE_URL` to the final `https://` custom or `onrender.com` URL. Do not use localhost.
+5. Set `HOSTVERO_PUBLIC_BASE_URL=https://app.hostvero.net`. Do not use localhost or the old Render domain for public links.
 6. Configure Resend variables before deployment. Production scheduled notifications use `EMAIL`.
 7. For Kenya production payments, set `PAYSTACK_PAYMENT_MODE=live` and configure the Paystack secret key. Keep
    `STRIPE_PAYMENT_MODE=mock`, `MPESA_PAYMENT_MODE=mock`, and `WHATSAPP_ENABLED=false` unless those providers are
@@ -47,6 +47,7 @@ Do not set a separate Render build or start command for this Docker service. Ren
 | `STRIPE_PAYMENT_MODE` | Yes | Keep `mock` in Phase 10A. If changed to `live`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` become mandatory. |
 | `PAYSTACK_PAYMENT_MODE` | Yes for Kenya production | Set `live` to use Paystack-hosted M-Pesa/card checkout; otherwise keep `mock`. |
 | `PAYSTACK_SECRET_KEY` | Required when Paystack is live | Secret server-side key. Never expose it in JavaScript or logs. |
+| `HOSTVERO_PAYOUT_FINGERPRINT_SECRET` | Yes | Separate secret used only to protect saved payout-destination fingerprints. |
 | `PAYSTACK_PUBLIC_KEY` | Optional | Reserved for a future Paystack client integration; the current hosted-checkout flow does not use it. |
 | `MPESA_PAYMENT_MODE` | Yes | Keep `mock`; real Daraja is intentionally not part of this pass. |
 | `MPESA_WEBHOOK_SECRET` | Optional while M-Pesa is mock | Reserve for the future provider implementation. |
@@ -95,7 +96,7 @@ V18 adds host payout destinations and provider-fee/settlement accounting for Pay
 Configure the Paystack Dashboard webhook URL as:
 
 ```text
-https://guest-platform.onrender.com/api/webhooks/paystack
+https://app.hostvero.net/api/webhooks/paystack
 ```
 
 Paystack's `x-paystack-signature` is validated against `PAYSTACK_SECRET_KEY`. In live mode, Hostvero additionally

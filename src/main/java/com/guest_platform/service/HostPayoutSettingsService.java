@@ -96,7 +96,7 @@ public class HostPayoutSettingsService {
         String normalizedPhone = normalizeKenyanMpesa(request.mpesaPhone());
         String fingerprint = fingerprintService.fingerprint(normalizedPhone);
         String recipientCode = existing != null && existing.getPayoutMethod() == PayoutMethod.MPESA
-                && fingerprint.equals(existing.getMpesaPhoneFingerprint())
+                && fingerprintService.matchesExistingFingerprint(normalizedPhone, existing.getMpesaPhoneFingerprint())
                 ? existing.getPaystackRecipientCode()
                 : transferRecipientService.createIndividualMpesaRecipient(host, normalizedPhone);
         String last4 = normalizedPhone.substring(normalizedPhone.length() - 4);

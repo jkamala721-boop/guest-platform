@@ -49,9 +49,24 @@ class ProductionConfigurationTest {
                 .withProperty("app.notifications.resend.enabled", "true")
                 .withProperty("app.notifications.resend.api-key", "test-only-key")
                 .withProperty("app.notifications.resend.from", "noreply@example.test")
+                .withProperty("app.security.cors.allowed-origins", "https://app.hostvero.net")
+                .withProperty("app.security.payout-fingerprint-secret", "test-only-fingerprint-key")
                 .withProperty("app.payments.stripe.mode", "mock")
                 .withProperty("app.payments.paystack.mode", "mock")
                 .withProperty("app.notifications.whatsapp.enabled", "false")
                 .withProperty("app.payments.mpesa.mode", "mock");
+    }
+
+    @Test
+    void requiresDedicatedPayoutFingerprintSecretAndExactProductionCorsOrigin() {
+        MockEnvironment missingFingerprint = validProductionEnvironment()
+                .withProperty("app.security.payout-fingerprint-secret", "");
+        assertThatIllegalStateException().isThrownBy(() -> ProductionConfiguration.validate(missingFingerprint))
+                .withMessage("Production configuration is missing app.security.payout-fingerprint-secret");
+
+        MockEnvironment wildcardCors = validProductionEnvironment()
+                .withProperty("app.security.cors.allowed-origins", "*");
+        assertThatIllegalStateException().isThrownBy(() -> ProductionConfiguration.validate(wildcardCors))
+                .withMessage("Production CORS origin must be https://app.hostvero.net");
     }
 }

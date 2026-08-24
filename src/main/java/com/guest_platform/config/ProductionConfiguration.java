@@ -33,6 +33,10 @@ public class ProductionConfiguration {
         }
 
         validatePublicBaseUrl(required(environment, "app.public-base-url"));
+        if (!"https://app.hostvero.net".equals(required(environment, "app.security.cors.allowed-origins"))) {
+            throw new IllegalStateException("Production CORS origin must be https://app.hostvero.net");
+        }
+        required(environment, "app.security.payout-fingerprint-secret");
 
         String defaultChannel = required(environment, "app.notifications.default-channel");
         if (!"EMAIL".equals(defaultChannel.trim().toUpperCase(Locale.ROOT))) {
