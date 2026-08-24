@@ -4111,6 +4111,43 @@ const payoutForm = `
   </form>
 `;
 
+    const payoutConfiguredView = `
+      <div class="settings-profile-form">
+        <div class="settings-option-list">
+          <div class="settings-option">
+            <div>
+              <strong>Payout method</strong>
+              <span>${payoutSettings.payoutMethod === 'MPESA' ? 'M-Pesa' : 'Bank account'}</span>
+            </div>
+            <span class="settings-pill">Configured</span>
+          </div>
+
+          <div class="settings-option">
+            <div>
+              <strong>${payoutSettings.payoutMethod === 'MPESA' ? 'M-Pesa destination' : 'Bank destination'}</strong>
+              <span>${payoutSettings.payoutMethod === 'MPESA'
+                ? escapeHtml(payoutSettings.maskedMpesaPhone || 'Configured')
+                : `${escapeHtml(payoutSettings.settlementBankName || 'Bank account')}${payoutSettings.maskedAccountNumber
+                  ? ` · ${escapeHtml(payoutSettings.maskedAccountNumber)}`
+                  : ''}`}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-form-footer">
+          <div>
+            <strong>Payout destination active</strong>
+            <span>${payoutSettings.payoutMethod === 'MPESA'
+              ? 'Future Hostvero payouts will be sent to this M-Pesa destination.'
+              : 'Future Hostvero payouts will be settled to this bank destination.'}</span>
+          </div>
+          <button class="button secondary" type="button" id="reconfigure-payout">
+            Reconfigure payout
+          </button>
+        </div>
+      </div>
+    `;
+
 
     const content = `
       ${heading(
@@ -4180,7 +4217,9 @@ const payoutForm = `
 
           </header>
 
-          ${payoutForm}
+          <div id="payout-settings-content">
+            ${payoutSettings.configured ? payoutConfiguredView : payoutForm}
+          </div>
 
         </article>
 
@@ -4496,9 +4535,13 @@ const payoutForm = `
       }
     );
 
-    $('#payout-settings-form').addEventListener(
-      'submit',
-      async event => {
+    const bindPayoutSettingsForm = () => {
+      const form = $('#payout-settings-form');
+      if (!form) return;
+
+      form.addEventListener(
+        'submit',
+        async event => {
         event.preventDefault();
         const button = $('button[type="submit"]', event.currentTarget);
         setButtonBusy(button, true, 'Saving…');
@@ -4527,38 +4570,48 @@ const payoutForm = `
         } finally {
           setButtonBusy(button, false);
         }
-      }
-    );
-
-   const syncPayoutMethod = () => {
-      const selected = document.querySelector(
-        'input[name="payoutMethod"]:checked'
+        }
       );
 
-      if (!selected) return;
+      const syncPayoutMethod = () => {
+        const selected = form.querySelector(
+        'input[name="payoutMethod"]:checked'
+        );
 
-      const isBank = selected.value === 'BANK_ACCOUNT';
+        if (!selected) return;
 
-      document.querySelectorAll('[data-payout-bank]').forEach(section => {
-        section.style.display = isBank ? '' : 'none';
+        const isBank = selected.value === 'BANK_ACCOUNT';
 
-        section.querySelectorAll('input, select').forEach(input => {
-          input.disabled = !isBank;
-          input.required = isBank;
+        form.querySelectorAll('[data-payout-bank]').forEach(section => {
+          section.style.display = isBank ? '' : 'none';
+
+          section.querySelectorAll('input, select').forEach(input => {
+            input.disabled = !isBank;
+            input.required = isBank;
+          });
         });
-      });
 
-      document.querySelectorAll('[data-payout-mpesa]').forEach(section => {
-        section.style.display = isBank ? 'none' : '';
+        form.querySelectorAll('[data-payout-mpesa]').forEach(section => {
+          section.style.display = isBank ? 'none' : '';
 
-        section.querySelectorAll('input, select').forEach(input => {
-          input.disabled = isBank;
-          input.required = !isBank;
+          section.querySelectorAll('input, select').forEach(input => {
+            input.disabled = isBank;
+            input.required = !isBank;
+          });
         });
+      };
+
+      form.querySelectorAll('input[name="payoutMethod"]').forEach(input => {
+        input.addEventListener('change', syncPayoutMethod);
       });
+      syncPayoutMethod();
     };
-    document.querySelectorAll('input[name="payoutMethod"]').forEach(input => input.addEventListener('change', syncPayoutMethod));
-    syncPayoutMethod();
+
+    $('#reconfigure-payout')?.addEventListener('click', () => {
+      $('#payout-settings-content').innerHTML = payoutForm;
+      bindPayoutSettingsForm();
+    });
+    bindPayoutSettingsForm();
 
   } catch (error) {
 
