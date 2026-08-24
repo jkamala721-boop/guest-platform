@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalTime;
 
 import com.guest_platform.entity.PropertyType;
+import com.guest_platform.entity.PropertyAccessMethod;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -28,6 +29,11 @@ public record PropertyUpsertRequest(
         @Size(max = 200) String wifiPassword,
         @Size(max = 5000) String houseRules,
         @Size(max = 5000) String checkInInstructions,
+        PropertyAccessMethod accessMethod,
+        @Size(max = 200) String accessCode,
+        @Size(max = 5000) String accessLocationInstructions,
+        @Size(max = 5000) String parkingEntryInstructions,
+        @Size(max = 5000) String checkOutInstructions,
         @Size(max = 32) String contactPhone,
         @NotNull Boolean active) {
 }

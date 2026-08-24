@@ -68,6 +68,22 @@ public class Property {
     @Column(name = "check_in_instructions", length = 5000)
     private String checkInInstructions;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_method", length = 40)
+    private PropertyAccessMethod accessMethod;
+
+    @Column(name = "access_code_ciphertext", length = 1024)
+    private String accessCodeCiphertext;
+
+    @Column(name = "access_location_instructions", length = 5000)
+    private String accessLocationInstructions;
+
+    @Column(name = "parking_entry_instructions", length = 5000)
+    private String parkingEntryInstructions;
+
+    @Column(name = "check_out_instructions", length = 5000)
+    private String checkOutInstructions;
+
     @Column(name = "contact_phone", length = 32)
     private String contactPhone;
 
@@ -105,7 +121,9 @@ public class Property {
     public void update(String name, PropertyType propertyType, String address, String mapsUrl,
             int maxGuests, BigDecimal defaultNightlyRate, String currency, LocalTime checkInTime,
             LocalTime checkOutTime, String wifiName, String wifiPassword, String houseRules,
-            String checkInInstructions, String contactPhone, boolean active) {
+            String checkInInstructions, String contactPhone, boolean active, PropertyAccessMethod accessMethod,
+            String accessCodeCiphertext, String accessLocationInstructions, String parkingEntryInstructions,
+            String checkOutInstructions) {
         this.name = name;
         this.propertyType = propertyType;
         this.address = address;
@@ -119,6 +137,11 @@ public class Property {
         this.wifiPassword = wifiPassword;
         this.houseRules = houseRules;
         this.checkInInstructions = checkInInstructions;
+        this.accessMethod = accessMethod;
+        this.accessCodeCiphertext = accessCodeCiphertext;
+        this.accessLocationInstructions = accessLocationInstructions;
+        this.parkingEntryInstructions = parkingEntryInstructions;
+        this.checkOutInstructions = checkOutInstructions;
         this.contactPhone = contactPhone;
         this.active = active;
     }
@@ -138,6 +161,11 @@ public class Property {
     public String getWifiPassword() { return wifiPassword; }
     public String getHouseRules() { return houseRules; }
     public String getCheckInInstructions() { return checkInInstructions; }
+    public PropertyAccessMethod getAccessMethod() { return accessMethod; }
+    public String getAccessCodeCiphertext() { return accessCodeCiphertext; }
+    public String getAccessLocationInstructions() { return accessLocationInstructions; }
+    public String getParkingEntryInstructions() { return parkingEntryInstructions; }
+    public String getCheckOutInstructions() { return checkOutInstructions; }
     public String getContactPhone() { return contactPhone; }
     public boolean isActive() { return active; }
     public Instant getCreatedAt() { return createdAt; }

@@ -13,7 +13,7 @@ public record PublicGuestStayResponse(GuestLinkState state, Instant expiresAt, b
         PropertyStayDetails property, StayDetails stay, PaymentDetails payment, ReceiptDetails receipt)
         implements PublicGuestLinkResponse {
 
-    public static PublicGuestStayResponse from(GuestLink guestLink, Receipt receipt) {
+    public static PublicGuestStayResponse from(GuestLink guestLink, Receipt receipt, String accessCode) {
         var booking = guestLink.getBooking();
         var property = booking.getProperty();
         var payment = receipt.getPayment();
@@ -21,7 +21,9 @@ public record PublicGuestStayResponse(GuestLinkState state, Instant expiresAt, b
                 new PropertyStayDetails(property.getName(), property.getAddress(), property.getMapsUrl(),
                         property.getCheckInTime(), property.getCheckOutTime(), property.getCheckInInstructions(),
                         property.getWifiName(), property.getWifiPassword(), property.getHouseRules(),
-                        property.getContactPhone()),
+                        property.getContactPhone(), property.getAccessMethod(), accessCode,
+                        property.getAccessLocationInstructions(), property.getParkingEntryInstructions(),
+                        property.getCheckOutInstructions()),
                 new StayDetails(booking.getCheckInDate(), booking.getCheckOutDate()),
                 new PaymentDetails(payment.getAmount(), payment.getCurrency(), payment.getStatus(), payment.getPaidAt()),
                 new ReceiptDetails(true, receipt.getReceiptNumber()));
@@ -29,7 +31,9 @@ public record PublicGuestStayResponse(GuestLinkState state, Instant expiresAt, b
 
     public record PropertyStayDetails(String name, String location, String mapsUrl, LocalTime checkInTime,
             LocalTime checkOutTime, String checkInInstructions, String wifiName, String wifiPassword,
-            String houseRules, String contactPhone) {
+            String houseRules, String contactPhone, com.guest_platform.entity.PropertyAccessMethod accessMethod,
+            String accessCode, String accessLocationInstructions, String parkingEntryInstructions,
+            String checkOutInstructions) {
     }
 
     public record StayDetails(LocalDate checkInDate, LocalDate checkOutDate) {

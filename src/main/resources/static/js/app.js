@@ -2945,6 +2945,15 @@ async function renderPropertyForm(id) {
             >${value('checkInInstructions')}</textarea>
           </div>
 
+          <div class="field">
+            <label for="property-access-method">Access method</label>
+            <select id="property-access-method" name="accessMethod"><option value="">Select if applicable</option>${['KEY', 'LOCKBOX', 'SMART_LOCK', 'RECEPTION', 'HOST_HANDOFF', 'OTHER'].map(method => `<option value="${method}" ${value('accessMethod') === method ? 'selected' : ''}>${titleCase(method)}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label for="property-access-code">Access code <span class="muted">(saved encrypted)</span></label><input id="property-access-code" name="accessCode" type="password" maxlength="200" autocomplete="new-password" placeholder="Leave blank to keep current code"></div>
+          <div class="field full"><label for="property-access-location">Where/how to access the property</label><textarea id="property-access-location" name="accessLocationInstructions">${value('accessLocationInstructions')}</textarea></div>
+          <div class="field full"><label for="property-parking-entry">Parking or entry instructions</label><textarea id="property-parking-entry" name="parkingEntryInstructions">${value('parkingEntryInstructions')}</textarea></div>
+          <div class="field full"><label for="property-checkout-instructions">Check-out instructions</label><textarea id="property-checkout-instructions" name="checkOutInstructions">${value('checkOutInstructions')}</textarea></div>
+
 
           <div class="field full">
             <label for="property-house-rules">
@@ -5222,6 +5231,8 @@ function renderRegistrationStay(result, token) {
         </p>
       </header>
 
+      <div class="public-form-note"><button class="button secondary" type="button" id="returning-guest">I have stayed here before</button></div>
+
 
       <form
         id="public-registration"
@@ -5405,7 +5416,7 @@ function renderPaymentStay(result) {
             <select id="public-payment-provider" name="provider"><option value="PAYSTACK">Paystack — M-Pesa or card</option><option value="STRIPE">Stripe</option></select>
           </div>
           <div class="public-summary" data-paystack-fee>
-            <div class="public-summary-item"><span>Hostvero service fee (5%)</span><strong>${formatMoney(result.payment.paystackServiceFee, result.payment.currency)}</strong></div>
+            <div class="public-summary-item"><span>Hostvero service fee (5%) <button class="button secondary" type="button" id="service-fee-explanation">Why is there a service fee?</button></span><strong>${formatMoney(result.payment.paystackServiceFee, result.payment.currency)}</strong></div>
             <div class="public-summary-item"><span>Total with Paystack</span><strong>${formatMoney(result.payment.paystackTotal, result.payment.currency)}</strong></div>
           </div>
           <div class="public-form-actions"><button class="button" type="submit">Pay securely</button></div>
@@ -5682,6 +5693,8 @@ function renderActiveStay(result, token) {
     </section>
 
 
+    ${renderPropertyAccess(property)}
+
     <section class="public-section public-manage-stay">
 
       <header class="public-section-header">
@@ -5719,6 +5732,10 @@ function renderActiveStay(result, token) {
     </section>
   `;
 }
+function renderPropertyAccess(property) {
+  if (!property.accessMethod && !property.accessLocationInstructions && !property.parkingEntryInstructions && !property.checkInInstructions && !property.checkOutInstructions) return '';
+  return `<section class="public-section"><header class="public-section-header"><h2>How to access the property</h2></header>${property.accessMethod ? `<p class="public-text"><strong>Access method:</strong> ${escapeHtml(titleCase(property.accessMethod))}</p>` : ''}${property.accessCode ? `<div class="public-form-actions"><button class="button secondary" type="button" data-show-access-code data-code="${escapeHtml(property.accessCode)}">Show access code</button></div>` : ''}${property.accessLocationInstructions ? `<p class="public-text">${escapeHtml(property.accessLocationInstructions)}</p>` : ''}${property.parkingEntryInstructions ? `<p class="public-text"><strong>Parking / entry:</strong> ${escapeHtml(property.parkingEntryInstructions)}</p>` : ''}${property.checkOutInstructions ? `<p class="public-text"><strong>Check-out:</strong> ${escapeHtml(property.checkOutInstructions)}</p>` : ''}</section>`;
+}
 function bindPublicForms() {
   const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
   const encodedToken = encodeURIComponent(token);
@@ -5745,6 +5762,20 @@ function bindPublicForms() {
       setButtonBusy(button, false);
     }
   });
+
+  $('#returning-guest')?.addEventListener('click', () => {
+    const modal = openModal({ title: 'Verify a previous stay', body: '<p class="muted">Enter the identification details you used for a previous stay at this property.</p><form id="returning-guest-form" class="public-registration-form"><div class="field"><label>Identity type</label><select name="identityType" required><option value="NATIONAL_ID">National ID</option><option value="PASSPORT">Passport</option></select></div><div class="field"><label>Identity number</label><input name="identityNumber" required maxlength="100" autocomplete="off"></div><div class="form-actions"><button class="button" type="submit">Send verification code</button></div></form>' });
+    $('#returning-guest-form', modal.root).addEventListener('submit', async event => {
+      event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true, 'Checking…');
+      try { const result = await post(`/api/public/guest/${encodedToken}/returning-guest`, Object.fromEntries(new FormData(event.currentTarget)));
+        if (!result.verificationRequired) { toast("We couldn't verify a previous stay with those details. You can continue with normal registration.", 'error'); modal.close(); return; }
+        modal.close(); returningGuestCodeModal(encodedToken, result.maskedDestination);
+      } catch (error) { handleFormError(error, event.currentTarget); } finally { setButtonBusy(button, false); }
+    });
+  });
+
+  $('#service-fee-explanation')?.addEventListener('click', () => openModal({ title: 'Why Hostvero charges a service fee', body: '<p class="muted">The 5% service fee helps Hostvero provide secure payment processing, booking protection and fraud-prevention measures, and support when something goes wrong with a reservation. The host\'s listed accommodation price is shown separately.</p>' }));
+  $('[data-show-access-code]')?.addEventListener('click', event => { const button = event.currentTarget; button.textContent = button.dataset.code; button.disabled = true; });
 
   $('#public-email-verification')?.addEventListener('submit', async event => {
     event.preventDefault();
@@ -5820,6 +5851,10 @@ function bindPublicForms() {
   });
   $('#public-extend')?.addEventListener('click', () => publicStayAction(token, 'extend'));
   $('#public-book-again')?.addEventListener('click', () => publicStayAction(token, 'again'));
+}
+function returningGuestCodeModal(encodedToken, destination) {
+  const modal = openModal({ title: 'Check your email', body: `<p class="muted">We found a previous stay. Enter the verification code sent to ${escapeHtml(destination)}.</p><form id="returning-guest-code" class="public-registration-form"><div class="field"><label>Verification code</label><input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></div><div class="form-actions"><button class="button" type="submit">Verify</button></div></form>` });
+  $('#returning-guest-code', modal.root).addEventListener('submit', async event => { event.preventDefault(); const button=$('button[type="submit"]',event.currentTarget); setButtonBusy(button,true,'Verifying…'); try { const result=await post(`/api/public/guest/${encodedToken}/returning-guest/confirm`,Object.fromEntries(new FormData(event.currentTarget))); const prefill=result.prefill; const form=$('#public-registration'); if(form && prefill){ Object.entries(prefill).forEach(([key,value])=>{const input=form.elements.namedItem(key); if(input && value) input.value=value;}); } modal.close(); toast('Your previous details are ready to review.', 'success'); } catch(error){handleFormError(error,event.currentTarget);} finally{setButtonBusy(button,false);} });
 }
 function isStripeCheckoutUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'checkout.stripe.com'; } catch { return false; } }
 function isPaystackCheckoutUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'checkout.paystack.com'; } catch { return false; } }

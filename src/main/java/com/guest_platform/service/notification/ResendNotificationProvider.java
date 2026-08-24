@@ -111,6 +111,7 @@ public class ResendNotificationProvider implements NotificationProvider {
             case MANUAL_MESSAGE -> notification.getSubject();
             case GUEST_LINK -> "Your Hostvero stay link";
             case EMAIL_VERIFICATION -> "Verify your Hostvero email";
+            case RETURNING_GUEST_VERIFICATION -> "Verify your previous Hostvero stay";
         };
     }
 
@@ -163,6 +164,10 @@ public class ResendNotificationProvider implements NotificationProvider {
             case EMAIL_VERIFICATION -> """
                     <p>Your Hostvero email verification code is:</p>
                     <p><strong>%s</strong></p>
+                    <p>This code expires in %s minutes. If you did not request it, you can ignore this email.</p>
+                    """.formatted(escapeHtml(parameter(notification, 0)), escapeHtml(parameter(notification, 1)));
+            case RETURNING_GUEST_VERIFICATION -> """
+                    <p>Your Hostvero verification code is:</p><p><strong>%s</strong></p>
                     <p>This code expires in %s minutes. If you did not request it, you can ignore this email.</p>
                     """.formatted(escapeHtml(parameter(notification, 0)), escapeHtml(parameter(notification, 1)));
         };

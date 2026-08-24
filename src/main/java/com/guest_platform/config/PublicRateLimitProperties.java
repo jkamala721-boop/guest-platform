@@ -13,6 +13,8 @@ public class PublicRateLimitProperties {
     private Limit guestLink = new Limit(120, 300);
     private Limit otpRequest = new Limit(5, 900);
     private Limit otpVerify = new Limit(10, 900);
+    private Limit returningGuestLookup = new Limit(5, 900);
+    private Limit returningGuestVerify = new Limit(10, 900);
     private Limit paymentInitialization = new Limit(10, 900);
     private Limit paystackWebhook = new Limit(240, 60);
 
@@ -30,6 +32,10 @@ public class PublicRateLimitProperties {
     public void setOtpRequest(Limit otpRequest) { this.otpRequest = otpRequest; }
     public Limit getOtpVerify() { return otpVerify; }
     public void setOtpVerify(Limit otpVerify) { this.otpVerify = otpVerify; }
+    public Limit getReturningGuestLookup() { return returningGuestLookup; }
+    public void setReturningGuestLookup(Limit returningGuestLookup) { this.returningGuestLookup = returningGuestLookup; }
+    public Limit getReturningGuestVerify() { return returningGuestVerify; }
+    public void setReturningGuestVerify(Limit returningGuestVerify) { this.returningGuestVerify = returningGuestVerify; }
     public Limit getPaymentInitialization() { return paymentInitialization; }
     public void setPaymentInitialization(Limit paymentInitialization) { this.paymentInitialization = paymentInitialization; }
     public Limit getPaystackWebhook() { return paystackWebhook; }

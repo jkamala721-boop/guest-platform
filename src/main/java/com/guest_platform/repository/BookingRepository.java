@@ -22,6 +22,18 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByHostIdOrderByCreatedAtDesc(UUID hostId);
     Optional<Booking> findByIdAndHostId(UUID id, UUID hostId);
 
+    @Query("""
+            select booking.guest from Booking booking
+            where booking.property.id = :propertyId and booking.id <> :currentBookingId
+              and booking.status in (com.guest_platform.entity.BookingStatus.CONFIRMED, com.guest_platform.entity.BookingStatus.CHECKED_IN, com.guest_platform.entity.BookingStatus.COMPLETED)
+              and booking.guest.active = true and booking.guest.identityType = :identityType
+              and booking.guest.identityFingerprint = :fingerprint
+            order by booking.updatedAt desc
+            """)
+    List<com.guest_platform.entity.Guest> findPriorConfirmedGuestsForProperty(@Param("propertyId") UUID propertyId,
+            @Param("currentBookingId") UUID currentBookingId, @Param("identityType") String identityType,
+            @Param("fingerprint") String fingerprint);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select booking from Booking booking where booking.id = :id")
     Optional<Booking> findForUpdateById(@Param("id") UUID id);

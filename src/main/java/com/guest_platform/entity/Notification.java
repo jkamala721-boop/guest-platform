@@ -105,6 +105,12 @@ public class Notification {
         this.message = message;
     }
 
+    public Notification(Booking booking, Guest recipient, NotificationType type, NotificationChannel channel,
+            String subject, String message, Instant scheduledAt) {
+        this(booking, type, channel, subject, message, scheduledAt);
+        this.guest = recipient;
+    }
+
     @PrePersist
     void onCreate() {
         if (id == null) {

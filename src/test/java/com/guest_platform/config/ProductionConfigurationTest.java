@@ -51,6 +51,8 @@ class ProductionConfigurationTest {
                 .withProperty("app.notifications.resend.from", "noreply@example.test")
                 .withProperty("app.security.cors.allowed-origins", "https://app.hostvero.net")
                 .withProperty("app.security.payout-fingerprint-secret", "test-only-fingerprint-key")
+                .withProperty("app.security.guest-identity-fingerprint-secret", "test-only-identity-key")
+                .withProperty("app.security.property-access-encryption-key", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
                 .withProperty("app.payments.stripe.mode", "mock")
                 .withProperty("app.payments.paystack.mode", "mock")
                 .withProperty("app.notifications.whatsapp.enabled", "false")

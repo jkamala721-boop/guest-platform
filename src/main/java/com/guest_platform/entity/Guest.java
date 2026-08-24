@@ -55,6 +55,15 @@ public class Guest {
     @Column(name = "id_number", length = 100)
     private String idNumber;
 
+    @Column(name = "identity_type", length = 40)
+    private String identityType;
+
+    @Column(name = "identity_fingerprint", length = 64)
+    private String identityFingerprint;
+
+    @Column(name = "masked_identity", length = 16)
+    private String maskedIdentity;
+
     @Column(length = 100)
     private String nationality;
 
@@ -118,6 +127,9 @@ public class Guest {
     public String getEmail() { return email; }
     public String getIdType() { return idType; }
     public String getIdNumber() { return idNumber; }
+    public String getIdentityType() { return identityType; }
+    public String getIdentityFingerprint() { return identityFingerprint; }
+    public String getMaskedIdentity() { return maskedIdentity; }
     public String getNationality() { return nationality; }
     public String getWhatsappNumber() { return whatsappNumber; }
     public String getNotes() { return notes; }
@@ -166,5 +178,20 @@ public class Guest {
 
     public void archive() {
         active = false;
+    }
+
+    /** New identity input is represented by a keyed fingerprint, never a new raw value. */
+    public void setProtectedIdentity(String type, String fingerprint, String masked) {
+        this.identityType = type;
+        this.identityFingerprint = fingerprint;
+        this.maskedIdentity = masked;
+        this.idType = type;
+    }
+
+    public void clearProtectedIdentity() {
+        this.identityType = null;
+        this.identityFingerprint = null;
+        this.maskedIdentity = null;
+        this.idType = null;
     }
 }

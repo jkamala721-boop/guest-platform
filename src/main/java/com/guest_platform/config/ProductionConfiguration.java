@@ -37,6 +37,8 @@ public class ProductionConfiguration {
             throw new IllegalStateException("Production CORS origin must be https://app.hostvero.net");
         }
         required(environment, "app.security.payout-fingerprint-secret");
+        required(environment, "app.security.guest-identity-fingerprint-secret");
+        required(environment, "app.security.property-access-encryption-key");
 
         String defaultChannel = required(environment, "app.notifications.default-channel");
         if (!"EMAIL".equals(defaultChannel.trim().toUpperCase(Locale.ROOT))) {

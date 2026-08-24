@@ -105,6 +105,17 @@ public class NotificationService {
                 "Email verification code delivery", List.of(code, Long.toString(codeTtlSeconds / 60)));
     }
 
+    @Transactional
+    public NotificationResponse sendReturningGuestVerification(Booking booking, com.guest_platform.entity.Guest recipient,
+            String code, long codeTtlSeconds) {
+        Notification notification = new Notification(booking, recipient, NotificationType.RETURNING_GUEST_VERIFICATION,
+                NotificationChannel.EMAIL, "Verify your previous Hostvero stay", "Returning guest verification", Instant.now());
+        notification.setDeliveryParameters(List.of(code, Long.toString(codeTtlSeconds / 60)));
+        notification = notificationRepository.save(notification);
+        deliverDueNotification(notification.getId(), Instant.now());
+        return NotificationResponse.from(notification);
+    }
+
     private NotificationResponse send(Booking booking, NotificationType type, NotificationChannel channel, String subject,
             String message, List<String> deliveryParameters) {
         if (booking.getGuest() == null) {
@@ -314,7 +325,7 @@ public class NotificationService {
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER -> requiresPayment(booking, checkInAt, now);
             case CHECKOUT_REMINDER -> (booking.getStatus() == BookingStatus.CONFIRMED
                     || booking.getStatus() == BookingStatus.CHECKED_IN) && checkOutAt.isAfter(now);
-            case MANUAL_MESSAGE, GUEST_LINK, EMAIL_VERIFICATION -> true;
+            case MANUAL_MESSAGE, GUEST_LINK, EMAIL_VERIFICATION, RETURNING_GUEST_VERIFICATION -> true;
         };
     }
 
@@ -336,7 +347,7 @@ public class NotificationService {
                     "Mock delivery completed; guest link action is required";
             case MANUAL_MESSAGE -> "Manual notification delivered";
             case GUEST_LINK -> "Guest link notification delivered";
-            case EMAIL_VERIFICATION -> "Email verification code delivered";
+            case EMAIL_VERIFICATION, RETURNING_GUEST_VERIFICATION -> "Email verification code delivered";
             default -> "Mock delivery completed";
         };
     }

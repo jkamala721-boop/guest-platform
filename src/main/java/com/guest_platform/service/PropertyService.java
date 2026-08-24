@@ -20,10 +20,13 @@ public class PropertyService {
 
     private final HostRepository hostRepository;
     private final PropertyRepository propertyRepository;
+    private final PropertyAccessEncryptionService propertyAccessEncryptionService;
 
-    public PropertyService(HostRepository hostRepository, PropertyRepository propertyRepository) {
+    public PropertyService(HostRepository hostRepository, PropertyRepository propertyRepository,
+            PropertyAccessEncryptionService propertyAccessEncryptionService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
+        this.propertyAccessEncryptionService = propertyAccessEncryptionService;
     }
 
     @Transactional
@@ -74,7 +77,11 @@ public class PropertyService {
                 request.maxGuests(), request.defaultNightlyRate(), request.currency().toUpperCase(Locale.ROOT),
                 request.checkInTime(), request.checkOutTime(), normalizeOptional(request.wifiName()),
                 normalizeOptional(request.wifiPassword()), normalizeOptional(request.houseRules()),
-                normalizeOptional(request.checkInInstructions()), normalizeOptional(request.contactPhone()), request.active());
+                normalizeOptional(request.checkInInstructions()), normalizeOptional(request.contactPhone()), request.active(),
+                request.accessMethod(), normalizeOptional(request.accessCode()) == null ? property.getAccessCodeCiphertext()
+                        : propertyAccessEncryptionService.encrypt(normalizeOptional(request.accessCode())),
+                normalizeOptional(request.accessLocationInstructions()), normalizeOptional(request.parkingEntryInstructions()),
+                normalizeOptional(request.checkOutInstructions()));
     }
 
     private String normalizeOptional(String value) {

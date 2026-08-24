@@ -47,11 +47,14 @@ public class GuestLinkService {
     private final ReceiptRepository receiptRepository;
     private final GuestRepository guestRepository;
     private final NotificationService notificationService;
+    private final PropertyAccessEncryptionService propertyAccessEncryptionService;
+    private final GuestIdentityFingerprintService identityFingerprintService;
     private final long emailVerificationResendCooldownSeconds;
 
     public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
             PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
             GuestRepository guestRepository, NotificationService notificationService,
+            PropertyAccessEncryptionService propertyAccessEncryptionService, GuestIdentityFingerprintService identityFingerprintService,
             @Value("${app.guest-email-verification.resend-cooldown-seconds:60}") long emailVerificationResendCooldownSeconds) {
         this.bookingRepository = bookingRepository;
         this.guestLinkRepository = guestLinkRepository;
@@ -59,6 +62,8 @@ public class GuestLinkService {
         this.receiptRepository = receiptRepository;
         this.guestRepository = guestRepository;
         this.notificationService = notificationService;
+        this.propertyAccessEncryptionService = propertyAccessEncryptionService;
+        this.identityFingerprintService = identityFingerprintService;
         this.emailVerificationResendCooldownSeconds = emailVerificationResendCooldownSeconds;
     }
 
@@ -113,7 +118,8 @@ public class GuestLinkService {
         if (guestLink.getState() == GuestLinkState.STAY_ACTIVE) {
             Receipt receipt = receiptRepository.findFirstByBookingIdOrderByIssuedAtDesc(guestLink.getBooking().getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
-            return PublicGuestStayResponse.from(guestLink, receipt);
+            return PublicGuestStayResponse.from(guestLink, receipt,
+                    propertyAccessEncryptionService.decrypt(guestLink.getBooking().getProperty().getAccessCodeCiphertext()));
         }
         PaymentStatus status = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(guestLink.getBooking().getId())
                 .map(Payment::getStatus)
@@ -161,6 +167,14 @@ public class GuestLinkService {
                     normalizeOptional(request.whatsappNumber()),
                     guest.getNotes()
             );
+        }
+
+        if (normalizeOptional(request.idType()) != null && normalizeOptional(request.idNumber()) != null) {
+            String type = normalizeOptional(request.idType()).toUpperCase(Locale.ROOT);
+            guest.setProtectedIdentity(type, identityFingerprintService.fingerprint(type, request.idNumber()),
+                    identityFingerprintService.masked(request.idNumber()));
+        } else {
+            guest.clearProtectedIdentity();
         }
 
         booking.prepareForPayment();

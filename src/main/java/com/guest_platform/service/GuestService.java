@@ -25,11 +25,14 @@ public class GuestService {
     private final HostRepository hostRepository;
     private final GuestRepository guestRepository;
     private final BookingRepository bookingRepository;
+    private final GuestIdentityFingerprintService identityFingerprintService;
 
-    public GuestService(HostRepository hostRepository, GuestRepository guestRepository, BookingRepository bookingRepository) {
+    public GuestService(HostRepository hostRepository, GuestRepository guestRepository, BookingRepository bookingRepository,
+            GuestIdentityFingerprintService identityFingerprintService) {
         this.hostRepository = hostRepository;
         this.guestRepository = guestRepository;
         this.bookingRepository = bookingRepository;
+        this.identityFingerprintService = identityFingerprintService;
     }
 
     @Transactional
@@ -93,6 +96,12 @@ public class GuestService {
         guest.update(fullName.trim(), phone.trim(), email.trim().toLowerCase(Locale.ROOT), normalizeOptional(idType),
                 normalizeOptional(idNumber), normalizeOptional(nationality), normalizeOptional(whatsappNumber),
                 normalizeOptional(notes));
+        if (normalizeOptional(idType) != null && normalizeOptional(idNumber) != null) {
+            String type = normalizeOptional(idType).toUpperCase(Locale.ROOT);
+            guest.setProtectedIdentity(type, identityFingerprintService.fingerprint(type, idNumber), identityFingerprintService.masked(idNumber));
+        } else {
+            guest.clearProtectedIdentity();
+        }
     }
 
     private String normalizeOptional(String value) {

@@ -66,6 +66,8 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
         if ("GET".equals(method) && suffix.isEmpty()) return Optional.of(new RequestLimit(Category.GUEST_LINK, tokenKey));
         if ("POST".equals(method) && "/email-verification".equals(suffix)) return Optional.of(new RequestLimit(Category.OTP_REQUEST, tokenKey));
         if ("POST".equals(method) && "/email-verification/confirm".equals(suffix)) return Optional.of(new RequestLimit(Category.OTP_VERIFY, tokenKey));
+        if ("POST".equals(method) && "/returning-guest".equals(suffix)) return Optional.of(new RequestLimit(Category.RETURNING_GUEST_LOOKUP, tokenKey));
+        if ("POST".equals(method) && "/returning-guest/confirm".equals(suffix)) return Optional.of(new RequestLimit(Category.RETURNING_GUEST_VERIFY, tokenKey));
         if ("POST".equals(method) && "/payments".equals(suffix)) return Optional.of(new RequestLimit(Category.PAYMENT_INITIALIZATION, tokenKey));
         return Optional.empty();
     }

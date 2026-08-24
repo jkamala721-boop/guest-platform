@@ -30,6 +30,11 @@ import java.time.LocalDate;
 import com.guest_platform.service.GuestLinkService;
 import com.guest_platform.service.GuestEmailVerificationService;
 import com.guest_platform.service.ReceiptService;
+import com.guest_platform.service.ReturningGuestRecognitionService;
+import com.guest_platform.dto.ReturningGuestLookupRequest;
+import com.guest_platform.dto.ReturningGuestLookupResponse;
+import com.guest_platform.dto.ReturningGuestVerifyRequest;
+import com.guest_platform.dto.ReturningGuestVerifyResponse;
 
 import jakarta.validation.Valid;
 
@@ -43,14 +48,17 @@ public class PublicGuestLinkController {
     private final BookingExtensionService extensionService;
     private final PaymentService paymentService;
     private final AvailabilityService availabilityService;
+    private final ReturningGuestRecognitionService returningGuestRecognitionService;
 
     public PublicGuestLinkController(GuestLinkService guestLinkService, GuestEmailVerificationService emailVerificationService,
             ReceiptService receiptService,
-            BookingExtensionService extensionService, PaymentService paymentService, AvailabilityService availabilityService) {
+            BookingExtensionService extensionService, PaymentService paymentService, AvailabilityService availabilityService,
+            ReturningGuestRecognitionService returningGuestRecognitionService) {
         this.guestLinkService = guestLinkService;
         this.emailVerificationService = emailVerificationService;
         this.receiptService = receiptService;
         this.extensionService = extensionService; this.paymentService = paymentService; this.availabilityService = availabilityService;
+        this.returningGuestRecognitionService = returningGuestRecognitionService;
     }
 
     @GetMapping("/{token}")
@@ -74,6 +82,18 @@ public class PublicGuestLinkController {
     public EmailVerificationResponse confirmEmailVerification(@PathVariable String token,
             @Valid @RequestBody EmailVerificationConfirmRequest request) {
         return emailVerificationService.confirmCode(token, request.code());
+    }
+
+    @PostMapping("/{token}/returning-guest")
+    public ReturningGuestLookupResponse findReturningGuest(@PathVariable String token,
+            @Valid @RequestBody ReturningGuestLookupRequest request) {
+        return returningGuestRecognitionService.lookup(token, request);
+    }
+
+    @PostMapping("/{token}/returning-guest/confirm")
+    public ReturningGuestVerifyResponse confirmReturningGuest(@PathVariable String token,
+            @Valid @RequestBody ReturningGuestVerifyRequest request) {
+        return returningGuestRecognitionService.verify(token, request.code());
     }
 
     @PostMapping("/{token}/payments")

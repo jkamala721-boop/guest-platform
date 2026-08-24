@@ -51,6 +51,12 @@ public class ApiExceptionHandler {
             return response(HttpStatus.CONFLICT, "PAYMENT_FAILED",
                     "We couldn't verify this payment. Your booking has not been confirmed.", null, false, null);
         }
+        if (text.contains("returning guest verification is required")) {
+            return response(HttpStatus.CONFLICT, "RETURNING_GUEST_NOT_VERIFIED", "Please verify your previous stay first.", null, false, null);
+        }
+        if (text.contains("verification code is invalid") || text.contains("verification code is invalid or has expired")) {
+            return response(HttpStatus.CONFLICT, "RETURNING_GUEST_OTP_INVALID", "The verification code is invalid or has expired.", null, false, null);
+        }
         return response(HttpStatus.CONFLICT, "CONFLICT", exception.getMessage(), null, false, null);
     }
 

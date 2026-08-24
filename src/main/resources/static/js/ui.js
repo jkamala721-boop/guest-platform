@@ -34,9 +34,10 @@ export function toast(message, kind = '') {
 
 export function openModal({ title, body, actions = '' }) {
   const backdrop = document.createElement('div'); backdrop.className = 'modal-backdrop'; backdrop.innerHTML = `<section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="modal-header"><h2 id="dialog-title">${escapeHtml(title)}</h2><button class="icon-button" type="button" aria-label="Close dialog">×</button></header><div class="modal-body">${body}${actions ? `<div class="form-actions">${actions}</div>` : ''}</div></section>`;
-  const close = () => backdrop.remove();
+  const close = () => { document.removeEventListener('keydown', onKeydown); backdrop.remove(); };
+  const onKeydown = event => { if (event.key === 'Escape') close(); };
   $('.icon-button', backdrop).addEventListener('click', close); backdrop.addEventListener('click', event => { if (event.target === backdrop) close(); });
-  document.body.append(backdrop); $('.icon-button', backdrop).focus(); return { root: backdrop, close };
+  document.body.append(backdrop); document.addEventListener('keydown', onKeydown); $('.icon-button', backdrop).focus(); return { root: backdrop, close };
 }
 
 export function confirmDialog({ title, message, confirmLabel = 'Confirm', danger = false }) {
