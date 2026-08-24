@@ -4503,8 +4503,24 @@ const payoutForm = `
         const button = $('button[type="submit"]', event.currentTarget);
         setButtonBusy(button, true, 'Saving…');
         try {
-          await put('/api/me/payout-settings', Object.fromEntries(new FormData(event.currentTarget)));
-          toast('Payout settings saved.', 'success');
+          const formData = Object.fromEntries(
+            new FormData(event.currentTarget)
+          );
+
+          await put('/api/me/payout-settings', formData);
+
+          if (formData.payoutMethod === 'MPESA') {
+            toast(
+              'M-Pesa payout configured. Future Hostvero payouts will be sent to your saved M-Pesa destination.',
+              'success'
+            );
+          } else {
+            toast(
+              'Bank payout configured. Future Hostvero payouts will be settled to your saved bank account.',
+              'success'
+            );
+          }
+
           renderSettings();
         } catch (error) {
           handleFormError(error, event.currentTarget);
