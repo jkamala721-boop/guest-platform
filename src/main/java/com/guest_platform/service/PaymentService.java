@@ -2,6 +2,8 @@ package com.guest_platform.service;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -180,6 +182,20 @@ public class PaymentService {
         return PaymentResponse.from(payment);
     }
 
+    /** Accepts a signature- and transaction-verified Paystack success only. */
+    @Transactional
+    public PaymentResponse processVerifiedPaystackWebhook(PaystackWebhookPayment request) {
+        Payment payment = paymentRepository.findForUpdateByProviderAndProviderReference(PaymentProvider.PAYSTACK,
+                requireValue(request.providerReference(), "providerReference"))
+                .orElseThrow(() -> new ResourceNotFoundException("Payment was not found"));
+        if (!payment.getId().equals(request.paymentId()) || !payment.getBooking().getId().equals(request.bookingId())) {
+            throw new ResourceNotFoundException("Payment was not found");
+        }
+        verifyPaystackAmount(payment, request.amountMinor(), request.currency());
+        completeVerifiedPayment(payment, requireValue(request.eventId(), "eventId"));
+        return PaymentResponse.from(payment);
+    }
+
     private PaymentInitiationResponse beginPayment(Booking booking, BookingExtension extension,
             PaymentInitiateRequest request, String returnUrl) {
         PaymentProviderAdapter provider = providers.get(request.provider());
@@ -189,15 +205,25 @@ public class PaymentService {
         if (hasInProgressPayment(booking, extension)) {
             throw new ConflictException("A payment is already in progress");
         }
-        java.math.BigDecimal amount = extension == null ? booking.getTotalAmount() : extension.getAdditionalAmount();
+        if (extension == null && paymentRepository.existsByBookingIdAndStatus(booking.getId(), PaymentStatus.SUCCEEDED)) {
+            throw new ConflictException("Booking already has a successful payment.");
+        }
+        BigDecimal bookingAmount = extension == null ? booking.getTotalAmount() : extension.getAdditionalAmount();
         String currency = extension == null ? booking.getCurrency() : extension.getCurrency();
+        PaymentAmounts amounts = paymentAmounts(request.provider(), bookingAmount);
+        String customerEmail = booking.getGuest() == null ? null : booking.getGuest().getEmail();
+        if (request.provider() == PaymentProvider.PAYSTACK && (customerEmail == null || customerEmail.isBlank())) {
+            throw new ConflictException("A guest email is required for Paystack payment");
+        }
         Payment payment = extension == null
-                ? new Payment(booking.getHost(), booking, request.provider(), pendingReference(), amount, currency)
-                : new Payment(booking.getHost(), booking, extension, request.provider(), pendingReference(), amount, currency);
+                ? new Payment(booking.getHost(), booking, request.provider(), pendingReference(), amounts.bookingAmount(),
+                        amounts.serviceFee(), amounts.chargedAmount(), currency)
+                : new Payment(booking.getHost(), booking, extension, request.provider(), pendingReference(),
+                        amounts.bookingAmount(), amounts.serviceFee(), amounts.chargedAmount(), currency);
         payment = paymentRepository.saveAndFlush(payment);
         PaymentProviderAdapter.PaymentInitiation initiation = provider.initiate(
-                new PaymentProviderAdapter.PaymentInitiationRequest(payment.getId(), booking.getId(), amount, currency,
-                        returnUrl));
+                new PaymentProviderAdapter.PaymentInitiationRequest(payment.getId(), booking.getId(),
+                        amounts.chargedAmount(), currency, returnUrl, customerEmail));
         payment.setProviderReference(requireValue(initiation.providerReference(), "providerReference"));
         return PaymentInitiationResponse.from(payment, initiation.nextAction());
     }
@@ -254,6 +280,21 @@ public class PaymentService {
         }
     }
 
+    private void verifyPaystackAmount(Payment payment, Long amountMinor, String currency) {
+        if (amountMinor == null || currency == null || !payment.getCurrency().equalsIgnoreCase(currency)
+                || payment.getAmount().movePointRight(2).longValueExact() != amountMinor.longValue()) {
+            throw new ConflictException("Paystack payment amount did not match the booking");
+        }
+    }
+
+    private PaymentAmounts paymentAmounts(PaymentProvider provider, BigDecimal bookingAmount) {
+        if (provider != PaymentProvider.PAYSTACK) {
+            return new PaymentAmounts(bookingAmount, BigDecimal.ZERO, bookingAmount);
+        }
+        BigDecimal serviceFee = bookingAmount.multiply(new BigDecimal("0.05")).setScale(2, RoundingMode.HALF_UP);
+        return new PaymentAmounts(bookingAmount, serviceFee, bookingAmount.add(serviceFee));
+    }
+
     private String pendingReference() {
         return "PENDING-" + UUID.randomUUID();
     }
@@ -297,5 +338,12 @@ public class PaymentService {
 
     public record StripeWebhookPayment(UUID paymentId, UUID bookingId, String providerReference, String eventId,
             StripePaymentOutcome outcome, Long amountMinor, String currency, String failureReason) {
+    }
+
+    public record PaystackWebhookPayment(UUID paymentId, UUID bookingId, String providerReference, String eventId,
+            Long amountMinor, String currency) {
+    }
+
+    private record PaymentAmounts(BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount) {
     }
 }

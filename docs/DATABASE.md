@@ -140,6 +140,11 @@ Provider examples:
 
 - MPESA
 - STRIPE
+- PAYSTACK
+- CASH
+
+For Paystack payments, retain the host booking amount, the Hostvero service fee, and the resulting charged amount as
+separate auditable values. The service fee must be server-calculated and is not applied to cash payments.
 
 ---
 

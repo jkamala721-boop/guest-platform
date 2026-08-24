@@ -23,7 +23,9 @@ Do not set a separate Render build or start command for this Docker service. Ren
 4. Configure the Supabase JDBC URL, username, and password in Render's secret store.
 5. Set `HOSTVERO_PUBLIC_BASE_URL` to the final `https://` custom or `onrender.com` URL. Do not use localhost.
 6. Configure Resend variables before deployment. Production scheduled notifications use `EMAIL`.
-7. Keep `STRIPE_PAYMENT_MODE=mock`, `MPESA_PAYMENT_MODE=mock`, and `WHATSAPP_ENABLED=false` for Phase 10A.
+7. For Kenya production payments, set `PAYSTACK_PAYMENT_MODE=live` and configure the Paystack secret key. Keep
+   `STRIPE_PAYMENT_MODE=mock`, `MPESA_PAYMENT_MODE=mock`, and `WHATSAPP_ENABLED=false` unless those providers are
+   explicitly enabled.
 8. Deploy. Confirm Flyway completed, then confirm `GET /api/health` responds with HTTP 200.
 9. Verify host registration/login, an authenticated host request, and a secure guest link.
 10. Inspect Render logs for normal startup, without credentials, bearer tokens, guest tokens, or OTP values.
@@ -43,6 +45,9 @@ Do not set a separate Render build or start command for this Docker service. Ren
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Yes | Resend secret and verified sender. The property name is `RESEND_FROM_EMAIL`. |
 | `NOTIFICATION_DEFAULT_CHANNEL` | Yes | `EMAIL`. |
 | `STRIPE_PAYMENT_MODE` | Yes | Keep `mock` in Phase 10A. If changed to `live`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` become mandatory. |
+| `PAYSTACK_PAYMENT_MODE` | Yes for Kenya production | Set `live` to use Paystack-hosted M-Pesa/card checkout; otherwise keep `mock`. |
+| `PAYSTACK_SECRET_KEY` | Required when Paystack is live | Secret server-side key. Never expose it in JavaScript or logs. |
+| `PAYSTACK_PUBLIC_KEY` | Optional | Reserved for a future Paystack client integration; the current hosted-checkout flow does not use it. |
 | `MPESA_PAYMENT_MODE` | Yes | Keep `mock`; real Daraja is intentionally not part of this pass. |
 | `MPESA_WEBHOOK_SECRET` | Optional while M-Pesa is mock | Reserve for the future provider implementation. |
 | `WHATSAPP_ENABLED` | Yes | `false` in Phase 10A. When enabled later, all `WHATSAPP_*` credentials and approved template names are required. |
@@ -79,3 +84,19 @@ approval, and the required post-restore credential rotation before any productio
 - Supabase: check connection utilisation and `flyway_schema_history`; use the Connect panel rather than copying
   credentials into source files.
 - Providers: verify only configured providers. A disabled provider must have no credentials and make no network calls.
+
+## Paystack hosted checkout
+
+Hostvero initializes Paystack transactions from the backend and redirects guests to Paystack's hosted checkout. The
+guest is charged the booking amount plus a server-calculated 5% Hostvero service fee; cash payments never receive that
+fee. Flyway V17 stores the booking amount and fee separately from the charged payment amount for auditability.
+
+Configure the Paystack Dashboard webhook URL as:
+
+```text
+https://guest-platform.onrender.com/api/webhooks/paystack
+```
+
+Paystack's `x-paystack-signature` is validated against `PAYSTACK_SECRET_KEY`. In live mode, Hostvero additionally
+calls Paystack's server-side transaction verification endpoint before the shared payment-completion flow runs. A
+browser callback only returns the guest to the secure link; it never confirms the booking.

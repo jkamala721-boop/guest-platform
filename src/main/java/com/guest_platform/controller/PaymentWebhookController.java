@@ -12,6 +12,7 @@ import com.guest_platform.entity.PaymentProvider;
 import com.guest_platform.service.PaymentService;
 import com.guest_platform.service.PaymentWebhookVerifier;
 import com.guest_platform.service.StripeWebhookService;
+import com.guest_platform.service.PaystackWebhookService;
 
 @RestController
 @RequestMapping("/api/webhooks")
@@ -20,12 +21,14 @@ public class PaymentWebhookController {
     private final PaymentWebhookVerifier paymentWebhookVerifier;
     private final PaymentService paymentService;
     private final StripeWebhookService stripeWebhookService;
+    private final PaystackWebhookService paystackWebhookService;
 
     public PaymentWebhookController(PaymentWebhookVerifier paymentWebhookVerifier, PaymentService paymentService,
-            StripeWebhookService stripeWebhookService) {
+            StripeWebhookService stripeWebhookService, PaystackWebhookService paystackWebhookService) {
         this.paymentWebhookVerifier = paymentWebhookVerifier;
         this.paymentService = paymentService;
         this.stripeWebhookService = stripeWebhookService;
+        this.paystackWebhookService = paystackWebhookService;
     }
 
     @PostMapping("/mpesa")
@@ -40,6 +43,13 @@ public class PaymentWebhookController {
     public ResponseEntity<Void> stripe(@RequestHeader(value = "Stripe-Signature", required = false) String signature,
             @RequestBody String payload) {
         stripeWebhookService.process(signature, payload);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/paystack")
+    public ResponseEntity<Void> paystack(@RequestHeader(value = "x-paystack-signature", required = false) String signature,
+            @RequestBody String payload) {
+        paystackWebhookService.process(signature, payload);
         return ResponseEntity.noContent().build();
     }
 }

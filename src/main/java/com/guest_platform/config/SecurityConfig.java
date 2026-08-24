@@ -45,7 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/public/guest/**").permitAll()
-                        .requestMatchers("/api/webhooks/mpesa", "/api/webhooks/stripe").permitAll()
+                        .requestMatchers("/api/webhooks/mpesa", "/api/webhooks/stripe", "/api/webhooks/paystack").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->
                         writeUnauthorized(response)))

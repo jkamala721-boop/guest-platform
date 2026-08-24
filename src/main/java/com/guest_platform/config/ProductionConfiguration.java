@@ -49,6 +49,10 @@ public class ProductionConfiguration {
             required(environment, "app.payments.stripe.webhook-secret");
         }
 
+        if ("live".equalsIgnoreCase(value(environment, "app.payments.paystack.mode"))) {
+            required(environment, "app.payments.paystack.secret-key");
+        }
+
         if (enabled(environment, "app.notifications.whatsapp.enabled")) {
             required(environment, "app.notifications.whatsapp.access-token");
             required(environment, "app.notifications.whatsapp.phone-number-id");

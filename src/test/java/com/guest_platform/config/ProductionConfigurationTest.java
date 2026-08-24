@@ -33,6 +33,14 @@ class ProductionConfigurationTest {
                 .withMessage("Production configuration is missing app.payments.stripe.secret-key");
     }
 
+    @Test
+    void requiresPaystackSecretOnlyWhenPaystackLiveModeIsEnabled() {
+        MockEnvironment livePaystack = validProductionEnvironment()
+                .withProperty("app.payments.paystack.mode", "live");
+        assertThatIllegalStateException().isThrownBy(() -> ProductionConfiguration.validate(livePaystack))
+                .withMessage("Production configuration is missing app.payments.paystack.secret-key");
+    }
+
     private MockEnvironment validProductionEnvironment() {
         return new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://pooler.example.test:5432/postgres?sslmode=require")
@@ -42,6 +50,7 @@ class ProductionConfigurationTest {
                 .withProperty("app.notifications.resend.api-key", "test-only-key")
                 .withProperty("app.notifications.resend.from", "noreply@example.test")
                 .withProperty("app.payments.stripe.mode", "mock")
+                .withProperty("app.payments.paystack.mode", "mock")
                 .withProperty("app.notifications.whatsapp.enabled", "false")
                 .withProperty("app.payments.mpesa.mode", "mock");
     }

@@ -10,6 +10,8 @@ services:
         value: mock
       - key: STRIPE_PAYMENT_MODE
         value: mock
+      - key: PAYSTACK_PAYMENT_MODE
+        value: live
       - key: RESEND_ENABLED
         value: "true"
       - key: NOTIFICATION_DEFAULT_CHANNEL
@@ -29,6 +31,10 @@ services:
       - key: HOSTVERO_PUBLIC_BASE_URL
         sync: false
       - key: RESEND_API_KEY
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_PUBLIC_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
         sync: false

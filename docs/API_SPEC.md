@@ -100,6 +100,11 @@ POST /api/webhooks/mpesa
 
 POST /api/webhooks/stripe
 
+POST /api/webhooks/paystack
+
+Paystack checkout is initialized through the existing booking payment endpoint using
+`{"provider":"PAYSTACK"}`. The browser receives only the Paystack authorization URL; the webhook is authoritative.
+
 Do not mark a payment successful from a browser-only response.
 
 ---

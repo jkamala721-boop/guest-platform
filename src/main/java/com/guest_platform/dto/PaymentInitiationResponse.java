@@ -8,10 +8,12 @@ import com.guest_platform.entity.PaymentProvider;
 import com.guest_platform.entity.PaymentStatus;
 
 public record PaymentInitiationResponse(UUID id, PaymentProvider provider, String providerReference,
-        BigDecimal amount, String currency, PaymentStatus status, String nextAction) {
+        BigDecimal amount, BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount, String currency,
+        PaymentStatus status, String nextAction) {
 
     public static PaymentInitiationResponse from(Payment payment, String nextAction) {
         return new PaymentInitiationResponse(payment.getId(), payment.getProvider(), payment.getProviderReference(),
-                payment.getAmount(), payment.getCurrency(), payment.getStatus(), nextAction);
+                payment.getAmount(), payment.getBookingAmount(), payment.getServiceFee(), payment.getAmount(),
+                payment.getCurrency(), payment.getStatus(), nextAction);
     }
 }

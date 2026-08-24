@@ -2047,7 +2047,7 @@ async function openHostReceiptDocument(bookingId, download) {
   }
 }
 
-function initiatePayment(path, successMessage) { const modal = openModal({ title: 'Initiate payment', body: '<p class="muted">Choose the configured payment provider. Payment success is always verified server-side.</p><div class="field"><label for="payment-provider">Provider</label><select id="payment-provider"><option value="MPESA">M-Pesa</option><option value="STRIPE">Stripe</option></select></div>', actions: '<button class="button" type="button" data-start-payment>Initiate payment</button>' }); $('[data-start-payment]', modal.root).addEventListener('click', async event => { const button = event.currentTarget; setButtonBusy(button, true, 'Starting…'); try { const result = await post(path, { provider: $('#payment-provider', modal.root).value }); modal.close(); openModal({ title: 'Payment initiated', body: `<div class="notice">${escapeHtml(successMessage)}</div><div class="detail-list" style="margin-top:1rem"><div class="detail-row"><span>Amount</span><strong>${formatMoney(result.amount, result.currency)}</strong></div><div class="detail-row"><span>Reference</span><strong>${escapeHtml(result.providerReference)}</strong></div><div class="detail-row"><span>Status</span>${badge(result.status)}</div></div>` }); } catch (error) { toast(error.message, 'error'); setButtonBusy(button, false); } }); }
+function initiatePayment(path, successMessage) { const modal = openModal({ title: 'Initiate payment', body: '<p class="muted">Choose the configured payment provider. Payment success is always verified server-side.</p><div class="field"><label for="payment-provider">Provider</label><select id="payment-provider"><option value="PAYSTACK">Paystack (M-Pesa or card)</option><option value="STRIPE">Stripe</option></select></div>', actions: '<button class="button" type="button" data-start-payment>Initiate payment</button>' }); $('[data-start-payment]', modal.root).addEventListener('click', async event => { const button = event.currentTarget; setButtonBusy(button, true, 'Starting…'); try { const result = await post(path, { provider: $('#payment-provider', modal.root).value }); modal.close(); openModal({ title: 'Payment initiated', body: `<div class="notice">${escapeHtml(successMessage)}</div><div class="detail-list" style="margin-top:1rem"><div class="detail-row"><span>Amount</span><strong>${formatMoney(result.amount, result.currency)}</strong></div>${Number(result.serviceFee || 0) > 0 ? `<div class="detail-row"><span>Hostvero service fee</span><strong>${formatMoney(result.serviceFee, result.currency)}</strong></div>` : ''}<div class="detail-row"><span>Reference</span><strong>${escapeHtml(result.providerReference)}</strong></div><div class="detail-row"><span>Status</span>${badge(result.status)}</div></div>` }); } catch (error) { toast(error.message, 'error'); setButtonBusy(button, false); } }); }
 
 function extendStay(booking, property, refresh) { const modal = openModal({ title: 'Extend stay', body: `<p class="muted">Current checkout: <strong>${formatDate(booking.checkOutDate)}</strong></p><form id="extend-form"><div class="field"><label for="extension-checkout">New checkout date</label><input id="extension-checkout" type="date" min="${dateInput(booking.checkOutDate)}" required></div><div id="extension-feedback" class="date-feedback">Choose a new date. Availability is checked by Hostvero.</div><div class="form-actions"><button class="button secondary" type="button" data-close>Cancel</button><button class="button" type="submit">Request extension</button></div></form>` }); $('[data-close]', modal.root).addEventListener('click', modal.close); $('#extend-form', modal.root).addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); const newCheckOutDate = $('#extension-checkout', modal.root).value; try { const response = await post(`/api/bookings/${booking.id}/extend`, { newCheckOutDate }); modal.close(); if (response.status === 'PENDING_PAYMENT') { const paymentModal = openModal({ title: 'Extension payment required', body: `<p class="notice warning">Your booking has not changed yet. ${formatMoney(response.additionalAmount, response.currency)} is due for ${response.addedNights} additional night${response.addedNights === 1 ? '' : 's'}.</p><p class="muted">Checkout updates only after Hostvero verifies the additional payment.</p>`, actions: '<button class="button" type="button" data-extension-payment>Initiate extension payment</button>' }); $('[data-extension-payment]', paymentModal.root).addEventListener('click', () => { paymentModal.close(); initiatePayment(`/api/booking-extensions/${response.id}/payments`, 'The extension will apply only after payment verification.'); }); } else { toast(`Stay extended to ${formatDate(response.requestedCheckOutDate)}.`, 'success'); refresh(); } } catch (error) { $('#extension-feedback', modal.root).className = 'date-feedback unavailable'; $('#extension-feedback', modal.root).textContent = error.status === 409 ? 'Those dates are no longer available.' : error.message; setButtonBusy(button, false); } }); }
 
@@ -5041,7 +5041,7 @@ function renderPaymentStay(result) {
     <section class="public-summary">
       <div class="public-summary-item"><span>Check-in</span><strong>${formatDate(result.stay.checkInDate)}</strong></div>
       <div class="public-summary-item"><span>Check-out</span><strong>${formatDate(result.stay.checkOutDate)}</strong></div>
-      <div class="public-summary-item"><span>Amount due</span><strong>${formatMoney(result.payment.amount, result.payment.currency)}</strong></div>
+      <div class="public-summary-item"><span>Stay</span><strong>${formatMoney(result.payment.amount, result.payment.currency)}</strong></div>
       <div class="public-summary-item"><span>Payment</span><div>${badge(result.payment.status)}</div></div>
     </section>
     ${renderEmailVerification(result)}
@@ -5055,9 +5055,13 @@ function renderPaymentStay(result) {
         <form id="public-payment" class="public-registration-form">
           <div class="field">
             <label for="public-payment-provider">Payment method</label>
-            <select id="public-payment-provider" name="provider"><option value="MPESA">M-Pesa</option><option value="STRIPE">Stripe</option></select>
+            <select id="public-payment-provider" name="provider"><option value="PAYSTACK">Paystack — M-Pesa or card</option><option value="STRIPE">Stripe</option></select>
           </div>
-          <div class="public-form-actions"><button class="button" type="submit">Continue to payment</button></div>
+          <div class="public-summary" data-paystack-fee>
+            <div class="public-summary-item"><span>Hostvero service fee (5%)</span><strong>${formatMoney(result.payment.paystackServiceFee, result.payment.currency)}</strong></div>
+            <div class="public-summary-item"><span>Total with Paystack</span><strong>${formatMoney(result.payment.paystackTotal, result.payment.currency)}</strong></div>
+          </div>
+          <div class="public-form-actions"><button class="button" type="submit">Pay securely</button></div>
         </form>
       ` : '<div class="public-form-note">Refresh this page in a few moments after your provider confirms payment.</div>'}
     </section>
@@ -5448,7 +5452,8 @@ function bindPublicForms() {
     setButtonBusy(button, true, 'Starting…');
     try {
       const payment = await post(`/api/public/guest/${encodedToken}/payments`, Object.fromEntries(new FormData(event.currentTarget)));
-      if (payment.provider === 'STRIPE' && isStripeCheckoutUrl(payment.nextAction)) {
+      if ((payment.provider === 'STRIPE' && isStripeCheckoutUrl(payment.nextAction))
+          || (payment.provider === 'PAYSTACK' && isPaystackCheckoutUrl(payment.nextAction))) {
         window.location.assign(payment.nextAction);
         return;
       }
@@ -5461,10 +5466,16 @@ function bindPublicForms() {
       setButtonBusy(button, false);
     }
   });
+  $('#public-payment-provider')?.addEventListener('change', event => {
+    document.querySelectorAll('[data-paystack-fee]').forEach(item => {
+      item.hidden = event.currentTarget.value !== 'PAYSTACK';
+    });
+  });
   $('#public-extend')?.addEventListener('click', () => publicStayAction(token, 'extend'));
   $('#public-book-again')?.addEventListener('click', () => publicStayAction(token, 'again'));
 }
 function isStripeCheckoutUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'checkout.stripe.com'; } catch { return false; } }
+function isPaystackCheckoutUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'checkout.paystack.com'; } catch { return false; } }
 
 function publicStayAction(token, type) { const extend = type === 'extend'; const modal = openModal({ title: extend ? 'Extend your stay' : 'Book again', body: `<p class="muted">Hostvero will check availability before creating your request.</p><form id="public-stay-form">${extend ? '<div class="field"><label>New checkout date</label><input name="newCheckOutDate" type="date" required></div>' : '<div class="form-grid"><div class="field"><label>Check-in date</label><input name="checkInDate" type="date" required></div><div class="field"><label>Check-out date</label><input name="checkOutDate" type="date" required></div></div>'}<div class="form-actions"><button class="button" type="submit">Check availability</button></div></form>` }); $('#public-stay-form', modal.root).addEventListener('submit', async event => { event.preventDefault(); const button = $('button[type="submit"]', event.currentTarget); setButtonBusy(button, true); try { const result = await post(`/api/public/guest/${encodeURIComponent(token)}/${extend ? 'extend' : 'book-again'}`, Object.fromEntries(new FormData(event.currentTarget))); modal.close(); toast(extend && result.status === 'PENDING_PAYMENT' ? 'Extension payment is required before your checkout changes.' : extend ? 'Your stay request was confirmed.' : 'Your future booking was created.', 'success'); renderPublicGuest(); } catch (error) { toast(error.status === 409 ? 'Those dates are no longer available.' : error.message, 'error'); setButtonBusy(button, false); } }); }
 

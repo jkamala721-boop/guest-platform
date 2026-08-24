@@ -9,11 +9,13 @@ import com.guest_platform.entity.PaymentProvider;
 import com.guest_platform.entity.PaymentStatus;
 
 public record PaymentResponse(UUID id, UUID bookingId, PaymentProvider provider, String providerReference,
-        BigDecimal amount, String currency, PaymentStatus status, Instant paidAt, Instant createdAt) {
+        BigDecimal amount, BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount, String currency,
+        PaymentStatus status, Instant paidAt, Instant createdAt) {
 
     public static PaymentResponse from(Payment payment) {
         return new PaymentResponse(payment.getId(), payment.getBooking().getId(), payment.getProvider(),
-                payment.getProviderReference(), payment.getAmount(), payment.getCurrency(), payment.getStatus(),
+                payment.getProviderReference(), payment.getAmount(), payment.getBookingAmount(), payment.getServiceFee(),
+                payment.getAmount(), payment.getCurrency(), payment.getStatus(),
                 payment.getPaidAt(), payment.getCreatedAt());
     }
 }

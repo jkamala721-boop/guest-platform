@@ -51,6 +51,12 @@ public class Payment {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "booking_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal bookingAmount;
+
+    @Column(name = "service_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal serviceFee;
+
     @Column(nullable = false, length = 3)
     private String currency;
 
@@ -75,11 +81,18 @@ public class Payment {
 
     public Payment(Host host, Booking booking, PaymentProvider provider, String providerReference,
             BigDecimal amount, String currency) {
+        this(host, booking, provider, providerReference, amount, BigDecimal.ZERO, amount, currency);
+    }
+
+    public Payment(Host host, Booking booking, PaymentProvider provider, String providerReference,
+            BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount, String currency) {
         this.host = host;
         this.booking = booking;
         this.provider = provider;
         this.providerReference = providerReference;
-        this.amount = amount;
+        this.bookingAmount = bookingAmount;
+        this.serviceFee = serviceFee;
+        this.amount = chargedAmount;
         this.currency = currency;
         this.status = PaymentStatus.PROCESSING;
     }
@@ -87,6 +100,13 @@ public class Payment {
     public Payment(Host host, Booking booking, BookingExtension bookingExtension, PaymentProvider provider,
             String providerReference, BigDecimal amount, String currency) {
         this(host, booking, provider, providerReference, amount, currency);
+        this.bookingExtension = bookingExtension;
+    }
+
+    public Payment(Host host, Booking booking, BookingExtension bookingExtension, PaymentProvider provider,
+            String providerReference, BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount,
+            String currency) {
+        this(host, booking, provider, providerReference, bookingAmount, serviceFee, chargedAmount, currency);
         this.bookingExtension = bookingExtension;
     }
 
@@ -154,6 +174,8 @@ public class Payment {
     public String getProviderReference() { return providerReference; }
     public String getProviderEventId() { return providerEventId; }
     public BigDecimal getAmount() { return amount; }
+    public BigDecimal getBookingAmount() { return bookingAmount; }
+    public BigDecimal getServiceFee() { return serviceFee; }
     public String getCurrency() { return currency; }
     public PaymentStatus getStatus() { return status; }
     public String getFailureReason() { return failureReason; }
