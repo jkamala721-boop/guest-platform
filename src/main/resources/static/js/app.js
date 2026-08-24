@@ -3920,54 +3920,127 @@ async function renderSettings() {
       <option value="${escapeHtml(bank.code)}" ${bank.code === payoutSettings.settlementBankCode ? 'selected' : ''}>
         ${escapeHtml(bank.name)}
       </option>`).join('');
-    const payoutForm = `
-      <form id="payout-settings-form" class="settings-profile-form">
-        <div class="settings-form-grid">
-          <div class="field">
-            <label for="payout-method">Payout method</label>
-            <div id="payout-method">
-              <label><input type="radio" name="payoutMethod" value="BANK_ACCOUNT" ${payoutMethod === 'BANK_ACCOUNT' ? 'checked' : ''}> Bank account</label>
-              <label><input type="radio" name="payoutMethod" value="MPESA" ${payoutMethod === 'MPESA' ? 'checked' : ''}> M-Pesa</label>
-            </div>
-          </div>
-          <div class="field" data-payout-bank>
-            <label for="settlement-bank-code">Bank</label>
-            <select id="settlement-bank-code" name="settlementBankCode" required>
-              <option value="">Choose bank</option>
-              ${bankOptions}
-            </select>
-          </div>
-          <div class="field" data-payout-bank>
-            <label for="payout-account-number">Account number</label>
-            <input id="payout-account-number" name="accountNumber" required inputmode="numeric"
-              pattern="[0-9]{5,34}" maxlength="34" autocomplete="off">
-            <span class="help">${payoutSettings.maskedAccountNumber
-              ? `Current destination: ${escapeHtml(payoutSettings.maskedAccountNumber)}. Re-enter the full number to update it.`
-              : 'This number is sent securely to Paystack and is not stored by Hostvero.'}</span>
-          </div>
-          <div class="field" data-payout-bank>
-            <label for="payout-account-name">Account name</label>
-            <input id="payout-account-name" name="accountName" required maxlength="160"
-              value="${escapeHtml(payoutSettings.accountName || '')}">
-          </div>
-          <div class="field" data-payout-mpesa>
-            <label for="payout-mpesa-phone">M-Pesa phone number</label>
-            <input id="payout-mpesa-phone" name="mpesaPhone" type="tel" inputmode="tel"
-              pattern="(?:\\+2547\\d{8}|2547\\d{8}|07\\d{8})" maxlength="13" autocomplete="off">
-            <span class="help">${payoutSettings.maskedMpesaPhone
-              ? `Current destination: ${escapeHtml(payoutSettings.maskedMpesaPhone)}. Re-enter the full number to change it.`
-              : 'Use +2547XXXXXXXX, 2547XXXXXXXX, or 07XXXXXXXX.'}</span>
-          </div>
-        </div>
-        <div class="settings-form-footer">
+    const isBankPayout = payoutMethod === 'BANK_ACCOUNT';
+const isMpesaPayout = payoutMethod === 'MPESA';
+
+const payoutForm = `
+  <form id="payout-settings-form" class="settings-profile-form">
+    <div class="field">
+      <label>Payout method</label>
+      <div class="settings-option-list">
+        <label class="settings-option" style="cursor:pointer;">
           <div>
-            <strong>Paystack payout destination</strong>
-            <span>Bank accounts settle through Paystack. M-Pesa payouts are queued independently after verified guest payment.</span>
+            <strong>Bank account</strong>
+            <span>Settle the booking amount to a Kenyan bank account through Paystack.</span>
           </div>
-          <button class="button" type="submit">Save payout settings</button>
+          <input
+            type="radio"
+            name="payoutMethod"
+            value="BANK_ACCOUNT"
+            ${isBankPayout ? 'checked' : ''}
+          >
+        </label>
+
+        <label class="settings-option" style="cursor:pointer;">
+          <div>
+            <strong>M-Pesa</strong>
+            <span>Send host payout to a Safaricom M-Pesa number after verified guest payment.</span>
+          </div>
+          <input
+            type="radio"
+            name="payoutMethod"
+            value="MPESA"
+            ${isMpesaPayout ? 'checked' : ''}
+          >
+        </label>
+      </div>
+    </div>
+
+    ${
+      isBankPayout
+        ? `
+      <div class="settings-form-grid">
+        <div class="field">
+          <label for="settlement-bank-code">Bank</label>
+          <select id="settlement-bank-code" name="settlementBankCode" required>
+            <option value="">Choose bank</option>
+            ${bankOptions}
+          </select>
         </div>
-      </form>
-    `;
+
+        <div class="field">
+          <label for="payout-account-name">Account name</label>
+          <input
+            id="payout-account-name"
+            name="accountName"
+            required
+            maxlength="160"
+            value="${escapeHtml(payoutSettings.accountName || '')}"
+          >
+        </div>
+
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="payout-account-number">Account number</label>
+          <input
+            id="payout-account-number"
+            name="accountNumber"
+            required
+            inputmode="numeric"
+            pattern="[0-9]{5,34}"
+            maxlength="34"
+            autocomplete="off"
+          >
+          <span class="help">
+            ${
+              payoutSettings.maskedAccountNumber
+                ? `Current destination: ${escapeHtml(payoutSettings.maskedAccountNumber)}. Re-enter the full account number to update it.`
+                : 'This number is sent securely to Paystack and is not stored in full by Hostvero.'
+            }
+          </span>
+        </div>
+      </div>
+    `
+        : `
+      <div class="settings-form-grid">
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="payout-mpesa-phone">M-Pesa phone number</label>
+          <input
+            id="payout-mpesa-phone"
+            name="mpesaPhone"
+            type="tel"
+            required
+            inputmode="tel"
+            pattern="(?:\\+2547\\d{8}|2547\\d{8}|07\\d{8})"
+            maxlength="13"
+            autocomplete="off"
+          >
+          <span class="help">
+            ${
+              payoutSettings.maskedMpesaPhone
+                ? `Current destination: ${escapeHtml(payoutSettings.maskedMpesaPhone)}. Re-enter the full number to change it.`
+                : 'Use +2547XXXXXXXX, 2547XXXXXXXX, or 07XXXXXXXX.'
+            }
+          </span>
+        </div>
+      </div>
+    `
+    }
+
+    <div class="settings-form-footer">
+      <div>
+        <strong>Paystack payout destination</strong>
+        <span>
+          ${
+            isBankPayout
+              ? 'The host booking amount settles to the selected bank account through Paystack.'
+              : 'M-Pesa payouts are queued after a verified guest payment and processed separately.'
+          }
+        </span>
+      </div>
+      <button class="button" type="submit">Save payout settings</button>
+    </div>
+  </form>
+`;
 
 
     const content = `
