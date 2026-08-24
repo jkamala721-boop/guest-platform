@@ -4514,15 +4514,31 @@ const payoutForm = `
       }
     );
 
-    const syncPayoutMethod = () => {
-      const isBank = document.querySelector('input[name="payoutMethod"]:checked').value === 'BANK_ACCOUNT';
-      document.querySelectorAll('[data-payout-bank]').forEach(field => {
-        field.hidden = !isBank;
-        field.querySelectorAll('input, select').forEach(input => input.disabled = !isBank);
+   const syncPayoutMethod = () => {
+      const selected = document.querySelector(
+        'input[name="payoutMethod"]:checked'
+      );
+
+      if (!selected) return;
+
+      const isBank = selected.value === 'BANK_ACCOUNT';
+
+      document.querySelectorAll('[data-payout-bank]').forEach(section => {
+        section.style.display = isBank ? '' : 'none';
+
+        section.querySelectorAll('input, select').forEach(input => {
+          input.disabled = !isBank;
+          input.required = isBank;
+        });
       });
-      document.querySelectorAll('[data-payout-mpesa]').forEach(field => {
-        field.hidden = isBank;
-        field.querySelectorAll('input').forEach(input => input.disabled = isBank);
+
+      document.querySelectorAll('[data-payout-mpesa]').forEach(section => {
+        section.style.display = isBank ? 'none' : '';
+
+        section.querySelectorAll('input, select').forEach(input => {
+          input.disabled = isBank;
+          input.required = !isBank;
+        });
       });
     };
     document.querySelectorAll('input[name="payoutMethod"]').forEach(input => input.addEventListener('change', syncPayoutMethod));
