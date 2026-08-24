@@ -122,7 +122,7 @@ class HostPayoutSettingsIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of("email", email, "password", PASSWORD,
                                 "passwordConfirmation", PASSWORD, "fullName", fullName, "phone", "+254711111111"))))
                 .andExpect(status().isCreated()).andReturn();
-        return json(result).get("accessToken").asText();
+        return TestSessionTokens.from(result);
     }
 
     private String createProperty(String token) throws Exception {

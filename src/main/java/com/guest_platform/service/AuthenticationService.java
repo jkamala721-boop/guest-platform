@@ -30,7 +30,7 @@ public class AuthenticationService {
     }
 
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public AuthenticatedSession register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
         if (hostRepository.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("An account already exists for this email address");
@@ -42,7 +42,7 @@ public class AuthenticationService {
     }
 
     @Transactional
-    public AuthResponse login(LoginRequest request) {
+    public AuthenticatedSession login(LoginRequest request) {
         Host host = hostRepository.findByEmailIgnoreCase(normalizeEmail(request.email()))
                 .filter(Host::isActive)
                 .filter(candidate -> passwordEncoder.matches(request.password(), candidate.getPasswordHash()))
@@ -50,9 +50,9 @@ public class AuthenticationService {
         return createAuthenticatedResponse(host);
     }
 
-    private AuthResponse createAuthenticatedResponse(Host host) {
+    private AuthenticatedSession createAuthenticatedResponse(Host host) {
         HostSessionService.SessionToken token = hostSessionService.create(host);
-        return new AuthResponse(token.value(), token.expiresAt(), HostResponse.from(host));
+        return new AuthenticatedSession(token, new AuthResponse(token.expiresAt(), HostResponse.from(host)));
     }
 
     private String normalizeEmail(String email) {
@@ -61,5 +61,8 @@ public class AuthenticationService {
 
     private String normalizeOptional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    public record AuthenticatedSession(HostSessionService.SessionToken sessionToken, AuthResponse response) {
     }
 }

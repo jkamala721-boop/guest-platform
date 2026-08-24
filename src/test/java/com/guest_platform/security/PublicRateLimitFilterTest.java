@@ -11,6 +11,8 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
+import tools.jackson.databind.ObjectMapper;
+
 import com.guest_platform.config.PublicRateLimitProperties;
 import com.guest_platform.config.PublicRateLimitProperties.Limit;
 
@@ -40,7 +42,7 @@ class PublicRateLimitFilterTest {
         assertThat(blocked.getStatus()).isEqualTo(429);
         assertThat(blocked.getHeader("Retry-After")).isNotBlank();
         assertThat(blocked.getContentAsString()).doesNotContain("raw-token-never-stored")
-                .contains("Too many requests. Please try again later.");
+                .contains("Too many attempts. Please wait and try again.");
         assertThat(otherIp.getStatus()).isEqualTo(200);
     }
 
@@ -73,6 +75,7 @@ class PublicRateLimitFilterTest {
         properties.setPaymentInitialization(new Limit(1, 60));
         properties.setPaystackWebhook(new Limit(1, 60));
         return new PublicRateLimitFilter(new PublicRateLimiter(properties,
-                Clock.fixed(Instant.parse("2026-08-24T00:00:00Z"), ZoneOffset.UTC)));
+                Clock.fixed(Instant.parse("2026-08-24T00:00:00Z"), ZoneOffset.UTC)),
+                new ApiErrorWriter(new ObjectMapper()));
     }
 }

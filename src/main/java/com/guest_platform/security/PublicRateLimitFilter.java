@@ -12,7 +12,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,9 +23,11 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
 
     private static final Pattern GUEST_TOKEN_PATH = Pattern.compile("^/api/public/guest/([^/]+)(.*)$");
     private final PublicRateLimiter rateLimiter;
+    private final ApiErrorWriter apiErrorWriter;
 
-    public PublicRateLimitFilter(PublicRateLimiter rateLimiter) {
+    public PublicRateLimitFilter(PublicRateLimiter rateLimiter, ApiErrorWriter apiErrorWriter) {
         this.rateLimiter = rateLimiter;
+        this.apiErrorWriter = apiErrorWriter;
     }
 
     @Override
@@ -42,10 +43,9 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
             RequestLimit requestLimit = limit.get();
             PublicRateLimiter.Decision decision = rateLimiter.check(requestLimit.category(), requestLimit.key());
             if (!decision.allowed()) {
-                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(decision.retryAfterSeconds()));
-                response.getWriter().write("{\"error\":\"Too Many Requests\",\"message\":\"Too many requests. Please try again later.\"}");
+                apiErrorWriter.write(response, HttpStatus.TOO_MANY_REQUESTS.value(), "RATE_LIMITED",
+                        "Too many attempts. Please wait and try again.", true);
                 return;
             }
         }

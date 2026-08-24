@@ -128,10 +128,11 @@ class WhatsAppNotificationIntegrationTest {
     }
 
     private String register(String email) throws Exception {
-        return json(mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+        MvcResult result = mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("email", email, "password", PASSWORD,
                         "passwordConfirmation", PASSWORD, "fullName", "WhatsApp Host", "phone", "+254711111111"))))
-                .andExpect(status().isCreated()).andReturn()).get("accessToken").asText();
+                .andExpect(status().isCreated()).andReturn();
+        return TestSessionTokens.from(result);
     }
 
     private String booking(String token, String phone, String whatsappNumber) throws Exception {

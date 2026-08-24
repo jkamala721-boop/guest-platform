@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,11 +26,20 @@ public class HostSessionService {
 
     private final HostSessionRepository hostSessionRepository;
     private final Duration sessionTtl;
+    private final String cookieName;
+    private final boolean cookieSecure;
+    private final String cookieSameSite;
 
     public HostSessionService(HostSessionRepository hostSessionRepository,
-            @Value("${app.auth.session-ttl-hours}") long sessionTtlHours) {
+            @Value("${app.auth.session-ttl-hours}") long sessionTtlHours,
+            @Value("${app.auth.cookie-name}") String cookieName,
+            @Value("${app.auth.cookie-secure}") boolean cookieSecure,
+            @Value("${app.auth.cookie-same-site}") String cookieSameSite) {
         this.hostSessionRepository = hostSessionRepository;
         this.sessionTtl = Duration.ofHours(sessionTtlHours);
+        this.cookieName = cookieName;
+        this.cookieSecure = cookieSecure;
+        this.cookieSameSite = cookieSameSite;
     }
 
     @Transactional
@@ -50,6 +60,18 @@ public class HostSessionService {
     @Transactional
     public void revoke(String rawToken) {
         hostSessionRepository.deleteByTokenHash(hash(rawToken));
+    }
+
+    public String cookieName() { return cookieName; }
+
+    public ResponseCookie sessionCookie(SessionToken token) {
+        return ResponseCookie.from(cookieName, token.value()).httpOnly(true).secure(cookieSecure)
+                .sameSite(cookieSameSite).path("/").maxAge(sessionTtl).build();
+    }
+
+    public ResponseCookie clearSessionCookie() {
+        return ResponseCookie.from(cookieName, "").httpOnly(true).secure(cookieSecure)
+                .sameSite(cookieSameSite).path("/").maxAge(Duration.ZERO).build();
     }
 
     private String newToken() {

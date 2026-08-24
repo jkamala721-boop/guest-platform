@@ -2,5 +2,6 @@ package com.guest_platform.dto;
 
 import java.time.Instant;
 
-public record AuthResponse(String accessToken, Instant expiresAt, HostResponse host) {
+/** Public host authentication response. The opaque session value is cookie-only. */
+public record AuthResponse(Instant expiresAt, HostResponse host) {
 }

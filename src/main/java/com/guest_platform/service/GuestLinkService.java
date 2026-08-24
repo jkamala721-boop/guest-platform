@@ -28,6 +28,7 @@ import com.guest_platform.entity.Payment;
 import com.guest_platform.entity.PaymentStatus;
 import com.guest_platform.entity.Receipt;
 import com.guest_platform.exception.ConflictException;
+import com.guest_platform.exception.GuestLinkExpiredException;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.BookingRepository;
 import com.guest_platform.repository.GuestLinkRepository;
@@ -191,11 +192,14 @@ public class GuestLinkService {
     public GuestLink resolveUsableGuestLink(String token) {
         GuestLink guestLink = guestLinkRepository.findByTokenHash(hash(token))
                 .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
-        if (guestLink.getBooking().getStatus() == BookingStatus.CANCELLED || !guestLink.isUsableAt(Instant.now())) {
-            if (guestLink.getRevokedAt() == null && guestLink.getState() != GuestLinkState.EXPIRED) {
+        if (guestLink.getBooking().getStatus() == BookingStatus.CANCELLED || guestLink.getRevokedAt() != null) {
+            throw new ResourceNotFoundException("Guest link was not found");
+        }
+        if (!guestLink.isUsableAt(Instant.now())) {
+            if (guestLink.getState() != GuestLinkState.EXPIRED) {
                 guestLink.expire();
             }
-            throw new ResourceNotFoundException("Guest link was not found");
+            throw new GuestLinkExpiredException();
         }
         return guestLink;
     }

@@ -1,4 +1,4 @@
-import { api, apiMany, del, get, post, put, session, ApiError } from './api.js';
+import { api, apiMany, del, get, post, put, ApiError } from './api.js';
 import { $, $$, badge, confirmDialog, emptyState, escapeHtml, formatDate, formatDateTime, formatMoney, openModal, setButtonBusy, titleCase, toast } from './ui.js';
 
 const app = $('#app');
@@ -2025,9 +2025,9 @@ async function openHostReceiptDocument(bookingId, download) {
   const receiptWindow = download ? null : window.open('', '_blank');
   try {
     const response = await fetch(`/api/bookings/${bookingId}/receipt/document${download ? '?download=true' : ''}`, {
-      headers: { Authorization: `Bearer ${session.token}` }
+      credentials: 'same-origin'
     });
-    if (!response.ok) throw new ApiError(response.status, 'We could not open that receipt.');
+    if (!response.ok) throw new ApiError(response.status, 'INTERNAL_ERROR', 'We could not open that receipt.');
     const documentUrl = URL.createObjectURL(await response.blob());
     if (download) {
       const link = document.createElement('a');
@@ -4986,8 +4986,6 @@ function renderAuth(mode = 'login') {
         formData
       );
 
-      session.token = response.accessToken;
-
       state.host = response.host;
 
       toast(
@@ -5900,14 +5898,13 @@ function handleFormError(error, form) {
     toast(message, 'error');
   }
 }
-function showHostError(route, error) { if (error?.status === 401) { session.clear(); state.host = null; go('login'); toast('Your session has expired.', 'error'); return; } app.innerHTML = hostShell(route, `${heading(pageTitle(route))}${emptyState('!', 'Unable to load this page', 'Please try again in a moment.', '<button class="button" type="button" id="retry-page">Try again</button>')}`); bindShell(); $('#retry-page').addEventListener('click', renderRoute); }
-function bindShell() { $('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Session is cleared regardless. */ } session.clear(); state.host = null; go('login'); }); }
+function showHostError(route, error) { if (error?.status === 401) { state.host = null; go('login'); toast(error.code === 'AUTH_SESSION_EXPIRED' ? 'Your session has expired. Please sign in again.' : 'Please sign in to continue.', 'error'); return; } app.innerHTML = hostShell(route, `${heading(pageTitle(route))}${emptyState('!', 'Unable to load this page', 'Please try again in a moment.', '<button class="button" type="button" id="retry-page">Try again</button>')}`); bindShell(); $('#retry-page').addEventListener('click', renderRoute); }
+function bindShell() { $('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Server logout is idempotent; always return to sign-in. */ } state.host = null; go('login'); }); }
 
 async function renderRoute() {
   if (isPublicRoute()) { await renderPublicGuest(); bindPublicForms(); return; }
   const route = hashRoute(); if (route === 'login' || route === 'register') { renderAuth(route); return; }
-  if (!session.token) { go('login'); return; }
-  try { state.host = state.host || await get('/api/me'); } catch (error) { session.clear(); state.host = null; go('login'); return; }
+  try { state.host = state.host || await get('/api/me'); } catch (error) { state.host = null; go('login'); if (error?.code === 'AUTH_SESSION_EXPIRED') toast('Your session has expired. Please sign in again.', 'error'); return; }
   if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route === 'properties/new') return renderPropertyForm(null); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go('overview');
 }
 

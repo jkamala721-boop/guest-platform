@@ -72,6 +72,6 @@ class SecurityHardeningIntegrationTest {
                                 "fullName", "Security Host",
                                 "phone", "+254711111111"))))
                 .andExpect(status().isCreated()).andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
+        return TestSessionTokens.from(result);
     }
 }

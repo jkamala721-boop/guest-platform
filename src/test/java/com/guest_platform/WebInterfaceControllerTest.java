@@ -45,7 +45,8 @@ class WebInterfaceControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("receipt/document")));
         mvc.perform(get("/js/api.js"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("sessionStorage")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("credentials: 'same-origin'")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("hostvero.session-token"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("localStorage"))));
     }
 

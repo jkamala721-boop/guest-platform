@@ -140,8 +140,7 @@ class PhaseTwoIntegrationTest {
                                 "phone", "+254711111111"))))
                 .andExpect(status().isCreated())
                 .andReturn();
-        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
-        return response.get("accessToken").asText();
+        return TestSessionTokens.from(result);
     }
 
     private String createGuest(String token, String fullName) throws Exception {
