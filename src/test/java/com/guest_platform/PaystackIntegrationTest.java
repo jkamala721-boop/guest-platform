@@ -1,5 +1,6 @@
 package com.guest_platform;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,6 +26,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.guest_platform.entity.HostPayoutStatus;
+import com.guest_platform.repository.HostPayoutRepository;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -38,6 +42,7 @@ class PaystackIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private HostPayoutRepository hostPayoutRepository;
     private int bookingOffset;
 
     @Test
@@ -185,6 +190,34 @@ class PaystackIntegrationTest {
                 .andExpect(jsonPath("$.hostveroNetAmount").value(-25.00));
     }
 
+    @Test
+    void mpesaPayoutHostUsesRecipientLifecycleAndDuplicateWebhookCreatesOnePendingPayout() throws Exception {
+        String hostToken = register("paystack-mpesa@example.com", "M-Pesa Settlement Host");
+        configureMpesaPayout(hostToken);
+        String propertyId = createProperty(hostToken, "M-Pesa Settlement Property");
+        String guestId = createGuest(hostToken, "M-Pesa Settlement Guest");
+        String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
+        JsonNode payment = initiate(hostToken, bookingId);
+        String payload = successPayload(payment, bookingId, 367500L, "KES", 1007L);
+
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(payload))
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isNoContent());
+        var payout = hostPayoutRepository.findByPaymentId(java.util.UUID.fromString(payment.get("id").asText()))
+                .orElseThrow();
+        assertThat(payout.getStatus()).isEqualTo(HostPayoutStatus.PENDING);
+        assertThat(payout.getAmount()).isEqualByComparingTo("3500.00");
+        assertThat(payout.getCurrency()).isEqualTo("KES");
+        mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(payload))
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isNoContent());
+        assertThat(hostPayoutRepository.findByPaymentId(java.util.UUID.fromString(payment.get("id").asText())))
+                .isPresent();
+    }
+
     private JsonNode initiate(String token, String bookingId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId)
                         .header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
@@ -223,6 +256,14 @@ class PaystackIntegrationTest {
                                 "payoutMethod", "BANK_ACCOUNT", "settlementBankCode", "KEPSS-TEST",
                                 "accountNumber", "0123456789", "accountName", "Paystack Host Account"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true));
+    }
+
+    private void configureMpesaPayout(String token) throws Exception {
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
+                                "payoutMethod", "MPESA", "mpesaPhone", "+254712345678"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.payoutMethod").value("MPESA"));
     }
 
     private String register(String email, String fullName) throws Exception {

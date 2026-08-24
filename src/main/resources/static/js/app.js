@@ -3818,9 +3818,10 @@ async function renderSettings() {
   bindShell();
 
   try {
-    const [host, payoutSettings] = await Promise.all([
+    const [host, payoutSettings, payoutBanks] = await Promise.all([
       get('/api/me'),
-      get('/api/me/payout-settings')
+      get('/api/me/payout-settings'),
+      get('/api/me/payout-settings/banks')
     ]);
 
     state.host = host;
@@ -3914,20 +3915,29 @@ async function renderSettings() {
       </form>
     `;
 
+    const payoutMethod = payoutSettings.payoutMethod || 'BANK_ACCOUNT';
+    const bankOptions = payoutBanks.map(bank => `
+      <option value="${escapeHtml(bank.code)}" ${bank.code === payoutSettings.settlementBankCode ? 'selected' : ''}>
+        ${escapeHtml(bank.name)}
+      </option>`).join('');
     const payoutForm = `
       <form id="payout-settings-form" class="settings-profile-form">
         <div class="settings-form-grid">
           <div class="field">
             <label for="payout-method">Payout method</label>
-            <input id="payout-method" readonly value="Bank account">
-            <input name="payoutMethod" type="hidden" value="BANK_ACCOUNT">
+            <div id="payout-method">
+              <label><input type="radio" name="payoutMethod" value="BANK_ACCOUNT" ${payoutMethod === 'BANK_ACCOUNT' ? 'checked' : ''}> Bank account</label>
+              <label><input type="radio" name="payoutMethod" value="MPESA" ${payoutMethod === 'MPESA' ? 'checked' : ''}> M-Pesa</label>
+            </div>
           </div>
-          <div class="field">
-            <label for="settlement-bank-code">Settlement bank code</label>
-            <input id="settlement-bank-code" name="settlementBankCode" required maxlength="80"
-              value="${escapeHtml(payoutSettings.settlementBankCode || '')}">
+          <div class="field" data-payout-bank>
+            <label for="settlement-bank-code">Bank</label>
+            <select id="settlement-bank-code" name="settlementBankCode" required>
+              <option value="">Choose bank</option>
+              ${bankOptions}
+            </select>
           </div>
-          <div class="field">
+          <div class="field" data-payout-bank>
             <label for="payout-account-number">Account number</label>
             <input id="payout-account-number" name="accountNumber" required inputmode="numeric"
               pattern="[0-9]{5,34}" maxlength="34" autocomplete="off">
@@ -3935,16 +3945,24 @@ async function renderSettings() {
               ? `Current destination: ${escapeHtml(payoutSettings.maskedAccountNumber)}. Re-enter the full number to update it.`
               : 'This number is sent securely to Paystack and is not stored by Hostvero.'}</span>
           </div>
-          <div class="field">
+          <div class="field" data-payout-bank>
             <label for="payout-account-name">Account name</label>
             <input id="payout-account-name" name="accountName" required maxlength="160"
               value="${escapeHtml(payoutSettings.accountName || '')}">
+          </div>
+          <div class="field" data-payout-mpesa>
+            <label for="payout-mpesa-phone">M-Pesa phone number</label>
+            <input id="payout-mpesa-phone" name="mpesaPhone" type="tel" inputmode="tel"
+              pattern="(?:\\+2547\\d{8}|2547\\d{8}|07\\d{8})" maxlength="13" autocomplete="off">
+            <span class="help">${payoutSettings.maskedMpesaPhone
+              ? `Current destination: ${escapeHtml(payoutSettings.maskedMpesaPhone)}. Re-enter the full number to change it.`
+              : 'Use +2547XXXXXXXX, 2547XXXXXXXX, or 07XXXXXXXX.'}</span>
           </div>
         </div>
         <div class="settings-form-footer">
           <div>
             <strong>Paystack payout destination</strong>
-            <span>Paystack settles the booking amount to this account. Hostvero keeps only the service-fee remainder after processing costs.</span>
+            <span>Bank accounts settle through Paystack. M-Pesa payouts are queued independently after verified guest payment.</span>
           </div>
           <button class="button" type="submit">Save payout settings</button>
         </div>
@@ -4353,6 +4371,20 @@ async function renderSettings() {
         }
       }
     );
+
+    const syncPayoutMethod = () => {
+      const isBank = document.querySelector('input[name="payoutMethod"]:checked').value === 'BANK_ACCOUNT';
+      document.querySelectorAll('[data-payout-bank]').forEach(field => {
+        field.hidden = !isBank;
+        field.querySelectorAll('input, select').forEach(input => input.disabled = !isBank);
+      });
+      document.querySelectorAll('[data-payout-mpesa]').forEach(field => {
+        field.hidden = isBank;
+        field.querySelectorAll('input').forEach(input => input.disabled = isBank);
+      });
+    };
+    document.querySelectorAll('input[name="payoutMethod"]').forEach(input => input.addEventListener('change', syncPayoutMethod));
+    syncPayoutMethod();
 
   } catch (error) {
 

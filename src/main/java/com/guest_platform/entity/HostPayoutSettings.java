@@ -16,8 +16,9 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 /**
- * Host-scoped Paystack destination details. The full account number is sent to
- * Paystack when saved and intentionally never retained by Hostvero.
+ * Host-scoped Paystack destination details. Bank accounts settle through a
+ * Paystack subaccount. M-Pesa destinations use a Paystack transfer recipient.
+ * Raw destination numbers are never retained by Hostvero.
  */
 @Entity
 @Table(name = "host_payout_settings")
@@ -36,17 +37,26 @@ public class HostPayoutSettings {
     @Column(name = "payout_method", nullable = false, length = 30)
     private PayoutMethod payoutMethod;
 
-    @Column(name = "settlement_bank_code", nullable = false, length = 80)
+    @Column(name = "settlement_bank_code", length = 80)
     private String settlementBankCode;
 
-    @Column(name = "account_number_last4", nullable = false, length = 4)
+    @Column(name = "account_number_last4", length = 4)
     private String accountNumberLast4;
 
-    @Column(name = "account_name", nullable = false, length = 160)
+    @Column(name = "account_name", length = 160)
     private String accountName;
 
-    @Column(name = "paystack_subaccount_code", nullable = false, unique = true, length = 100)
+    @Column(name = "paystack_subaccount_code", unique = true, length = 100)
     private String paystackSubaccountCode;
+
+    @Column(name = "paystack_recipient_code", unique = true, length = 100)
+    private String paystackRecipientCode;
+
+    @Column(name = "mpesa_phone_last4", length = 4)
+    private String mpesaPhoneLast4;
+
+    @Column(name = "mpesa_phone_fingerprint", length = 64)
+    private String mpesaPhoneFingerprint;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -62,23 +72,31 @@ public class HostPayoutSettings {
     }
 
     public HostPayoutSettings(Host host, PayoutMethod payoutMethod, String settlementBankCode,
-            String accountNumberLast4, String accountName, String paystackSubaccountCode) {
+            String accountNumberLast4, String accountName, String paystackSubaccountCode,
+            String paystackRecipientCode, String mpesaPhoneLast4, String mpesaPhoneFingerprint) {
         this.host = host;
         this.payoutMethod = payoutMethod;
         this.settlementBankCode = settlementBankCode;
         this.accountNumberLast4 = accountNumberLast4;
         this.accountName = accountName;
         this.paystackSubaccountCode = paystackSubaccountCode;
+        this.paystackRecipientCode = paystackRecipientCode;
+        this.mpesaPhoneLast4 = mpesaPhoneLast4;
+        this.mpesaPhoneFingerprint = mpesaPhoneFingerprint;
         this.status = PayoutSettingsStatus.CONFIGURED;
     }
 
     public void update(PayoutMethod payoutMethod, String settlementBankCode, String accountNumberLast4,
-            String accountName, String paystackSubaccountCode) {
+            String accountName, String paystackSubaccountCode, String paystackRecipientCode, String mpesaPhoneLast4,
+            String mpesaPhoneFingerprint) {
         this.payoutMethod = payoutMethod;
         this.settlementBankCode = settlementBankCode;
         this.accountNumberLast4 = accountNumberLast4;
         this.accountName = accountName;
         this.paystackSubaccountCode = paystackSubaccountCode;
+        this.paystackRecipientCode = paystackRecipientCode;
+        this.mpesaPhoneLast4 = mpesaPhoneLast4;
+        this.mpesaPhoneFingerprint = mpesaPhoneFingerprint;
         this.status = PayoutSettingsStatus.CONFIGURED;
     }
 
@@ -100,6 +118,9 @@ public class HostPayoutSettings {
     public String getAccountNumberLast4() { return accountNumberLast4; }
     public String getAccountName() { return accountName; }
     public String getPaystackSubaccountCode() { return paystackSubaccountCode; }
+    public String getPaystackRecipientCode() { return paystackRecipientCode; }
+    public String getMpesaPhoneLast4() { return mpesaPhoneLast4; }
+    public String getMpesaPhoneFingerprint() { return mpesaPhoneFingerprint; }
     public PayoutSettingsStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

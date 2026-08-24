@@ -46,8 +46,9 @@ public class PaystackPaymentProvider implements PaymentProviderAdapter {
         if (request.customerEmail() == null || request.customerEmail().isBlank()) {
             throw new IllegalArgumentException("A guest email is required for Paystack payment");
         }
-        if (request.paystackSubaccountCode() == null || request.paystackSubaccountCode().isBlank()
-                || request.paystackTransactionCharge() == null) {
+        boolean subaccountSettlement = request.paystackSubaccountCode() != null
+                && !request.paystackSubaccountCode().isBlank();
+        if (subaccountSettlement && request.paystackTransactionCharge() == null) {
             throw new IllegalStateException("Paystack payout settings are not configured");
         }
 
@@ -56,8 +57,9 @@ public class PaystackPaymentProvider implements PaymentProviderAdapter {
                 request.customerEmail(), String.valueOf(toMinorUnits(request.amount())),
                 request.currency().toUpperCase(Locale.ROOT), reference, request.returnUrl(),
                 "{\"paymentId\":\"" + request.paymentId() + "\",\"bookingId\":\"" + request.bookingId()
-                        + "\"}", request.paystackSubaccountCode(),
-                toMinorUnits(request.paystackTransactionCharge()), "account"));
+                        + "\"}", subaccountSettlement ? request.paystackSubaccountCode() : null,
+                subaccountSettlement ? toMinorUnits(request.paystackTransactionCharge()) : null,
+                subaccountSettlement ? "account" : null));
         if (!reference.equals(result.reference())) {
             throw new IllegalStateException("Paystack returned an unexpected transaction reference");
         }

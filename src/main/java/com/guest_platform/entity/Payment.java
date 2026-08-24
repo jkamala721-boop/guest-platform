@@ -66,6 +66,13 @@ public class Payment {
     @Column(name = "hostvero_net_amount", precision = 12, scale = 2)
     private BigDecimal hostveroNetAmount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payout_method", length = 30)
+    private PayoutMethod payoutMethod;
+
+    @Column(name = "payout_destination_reference", length = 100)
+    private String payoutDestinationReference;
+
     @Column(nullable = false, length = 3)
     private String currency;
 
@@ -186,6 +193,16 @@ public class Payment {
         hostveroNetAmount = serviceFee.subtract(actualProcessorFee);
     }
 
+    /** Snapshots the configured destination before the guest begins checkout. */
+    public void setPaystackPayoutDestination(PayoutMethod payoutMethod, String destinationReference) {
+        if (provider != PaymentProvider.PAYSTACK || status != PaymentStatus.PROCESSING || payoutMethod == null
+                || destinationReference == null || destinationReference.isBlank()) {
+            throw new IllegalArgumentException("Invalid Paystack payout destination");
+        }
+        this.payoutMethod = payoutMethod;
+        this.payoutDestinationReference = destinationReference;
+    }
+
     public UUID getId() { return id; }
     public Host getHost() { return host; }
     public Booking getBooking() { return booking; }
@@ -199,6 +216,8 @@ public class Payment {
     public BigDecimal getProcessorFee() { return processorFee; }
     public BigDecimal getHostPayoutAmount() { return hostPayoutAmount; }
     public BigDecimal getHostveroNetAmount() { return hostveroNetAmount; }
+    public PayoutMethod getPayoutMethod() { return payoutMethod; }
+    public String getPayoutDestinationReference() { return payoutDestinationReference; }
     public String getCurrency() { return currency; }
     public PaymentStatus getStatus() { return status; }
     public String getFailureReason() { return failureReason; }

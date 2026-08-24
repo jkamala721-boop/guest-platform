@@ -43,13 +43,15 @@ public class PaymentService {
     private final BookingExtensionRepository bookingExtensionRepository;
     private final BookingExtensionService bookingExtensionService;
     private final HostPayoutSettingsService hostPayoutSettingsService;
+    private final HostPayoutService hostPayoutService;
     private final Map<PaymentProvider, PaymentProviderAdapter> providers;
     private final String publicBaseUrl;
 
     public PaymentService(BookingRepository bookingRepository, PaymentRepository paymentRepository,
             ReceiptService receiptService, GuestLinkService guestLinkService, NotificationService notificationService,
             BookingExtensionRepository bookingExtensionRepository, BookingExtensionService bookingExtensionService,
-            HostPayoutSettingsService hostPayoutSettingsService, List<PaymentProviderAdapter> providerAdapters,
+            HostPayoutSettingsService hostPayoutSettingsService, HostPayoutService hostPayoutService,
+            List<PaymentProviderAdapter> providerAdapters,
             @Value("${app.public-base-url:http://localhost:8080}") String publicBaseUrl) {
         this.bookingRepository = bookingRepository;
         this.paymentRepository = paymentRepository;
@@ -59,6 +61,7 @@ public class PaymentService {
         this.bookingExtensionRepository = bookingExtensionRepository;
         this.bookingExtensionService = bookingExtensionService;
         this.hostPayoutSettingsService = hostPayoutSettingsService;
+        this.hostPayoutService = hostPayoutService;
         this.providers = providerAdapters.stream().collect(Collectors.toMap(PaymentProviderAdapter::provider,
                 Function.identity(), (first, ignored) -> first, () -> new EnumMap<>(PaymentProvider.class)));
         this.publicBaseUrl = trimTrailingSlash(publicBaseUrl);
@@ -216,8 +219,8 @@ public class PaymentService {
         BigDecimal bookingAmount = extension == null ? booking.getTotalAmount() : extension.getAdditionalAmount();
         String currency = extension == null ? booking.getCurrency() : extension.getCurrency();
         PaymentAmounts amounts = paymentAmounts(request.provider(), bookingAmount);
-        String paystackSubaccountCode = request.provider() == PaymentProvider.PAYSTACK
-                ? hostPayoutSettingsService.requireConfiguredPaystackSubaccount(booking.getHost().getId())
+        PaystackPayoutDestination paystackDestination = request.provider() == PaymentProvider.PAYSTACK
+                ? hostPayoutSettingsService.requireConfiguredPaystackDestination(booking.getHost().getId())
                 : null;
         String customerEmail = booking.getGuest() == null ? null : booking.getGuest().getEmail();
         if (request.provider() == PaymentProvider.PAYSTACK && (customerEmail == null || customerEmail.isBlank())) {
@@ -228,10 +231,14 @@ public class PaymentService {
                         amounts.serviceFee(), amounts.chargedAmount(), currency)
                 : new Payment(booking.getHost(), booking, extension, request.provider(), pendingReference(),
                         amounts.bookingAmount(), amounts.serviceFee(), amounts.chargedAmount(), currency);
+        if (paystackDestination != null) {
+            payment.setPaystackPayoutDestination(paystackDestination.method(), paystackDestination.providerReference());
+        }
         payment = paymentRepository.saveAndFlush(payment);
         PaymentProviderAdapter.PaymentInitiation initiation = provider.initiate(
                 new PaymentProviderAdapter.PaymentInitiationRequest(payment.getId(), booking.getId(),
-                        amounts.chargedAmount(), currency, returnUrl, customerEmail, paystackSubaccountCode,
+                        amounts.chargedAmount(), currency, returnUrl, customerEmail,
+                        paystackDestination == null ? null : paystackDestination.subaccountCode(),
                         request.provider() == PaymentProvider.PAYSTACK ? amounts.serviceFee() : null));
         payment.setProviderReference(requireValue(initiation.providerReference(), "providerReference"));
         return PaymentInitiationResponse.from(payment, initiation.nextAction());
@@ -260,6 +267,7 @@ public class PaymentService {
         receiptService.createForSucceededPayment(payment);
         guestLinkService.activateForConfirmedBooking(booking);
         notificationService.reconcileBooking(booking.getId());
+        hostPayoutService.queueForVerifiedPayment(payment);
     }
 
     private boolean hasInProgressPayment(Booking booking, BookingExtension extension) {

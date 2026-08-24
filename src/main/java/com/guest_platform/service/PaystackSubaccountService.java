@@ -27,7 +27,8 @@ public class PaystackSubaccountService {
 
     public String createOrUpdate(Host host, HostPayoutSettings existing, HostPayoutSettingsUpsertRequest request) {
         if ("mock".equalsIgnoreCase(mode)) {
-            return existing == null ? "ACCT_MOCK_" + UUID.randomUUID() : existing.getPaystackSubaccountCode();
+            return existing == null || existing.getPaystackSubaccountCode() == null
+                    ? "ACCT_MOCK_" + UUID.randomUUID() : existing.getPaystackSubaccountCode();
         }
         if (!"live".equalsIgnoreCase(mode)) {
             throw new IllegalStateException("Paystack payment mode is invalid");
@@ -38,7 +39,7 @@ public class PaystackSubaccountService {
         PaystackApiClient.SubaccountRequest payload = new PaystackApiClient.SubaccountRequest(
                 host.getFullName(), request.settlementBankCode().trim(), request.accountNumber().trim(),
                 "Hostvero host payout destination");
-        return existing == null
+        return existing == null || existing.getPaystackSubaccountCode() == null
                 ? paystackApiClient.createSubaccount(payload)
                 : paystackApiClient.updateSubaccount(existing.getPaystackSubaccountCode(), payload);
     }

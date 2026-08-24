@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.guest_platform.dto.HostPayoutSettingsResponse;
 import com.guest_platform.dto.HostPayoutSettingsUpsertRequest;
+import com.guest_platform.dto.PaystackBankResponse;
 import com.guest_platform.security.CurrentHost;
 import com.guest_platform.service.HostPayoutSettingsService;
 
@@ -25,6 +26,11 @@ public class HostPayoutSettingsController {
     @GetMapping("/api/me/payout-settings")
     public HostPayoutSettingsResponse get(Authentication authentication) {
         return hostPayoutSettingsService.get(CurrentHost.id(authentication));
+    }
+
+    @GetMapping("/api/me/payout-settings/banks")
+    public java.util.List<PaystackBankResponse> banks(Authentication authentication) {
+        return hostPayoutSettingsService.listKenyanBanks(CurrentHost.id(authentication));
     }
 
     @PutMapping("/api/me/payout-settings")

@@ -79,6 +79,39 @@ class HostPayoutSettingsIntegrationTest {
                 .andExpect(jsonPath("$.message").value("The host must configure payout settings before accepting Paystack payments"));
     }
 
+    @Test
+    void hostCanConfigureMaskedMpesaRecipientWithoutDuplicatingItOnRepeatSave() throws Exception {
+        String host = register("payout-mpesa@example.com", "M-Pesa Payout Host");
+
+        mockMvc.perform(get("/api/me/payout-settings/banks").header("Authorization", bearer(host)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].code").value("KEPSS-TEST"));
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
+                                "payoutMethod", "MPESA", "mpesaPhone", "0712345678"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.payoutMethod").value("MPESA"))
+                .andExpect(jsonPath("$.maskedMpesaPhone").value("****5678"))
+                .andExpect(jsonPath("$.paystackRecipientCode").doesNotExist());
+        String recipientCode = payoutSettingsRepository.findAll().stream()
+                .filter(settings -> settings.getPayoutMethod().name().equals("MPESA"))
+                .findFirst().orElseThrow().getPaystackRecipientCode();
+
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
+                                "payoutMethod", "MPESA", "mpesaPhone", "+254712345678"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.maskedMpesaPhone").value("****5678"));
+        assertThat(payoutSettingsRepository.findAll().stream()
+                .filter(settings -> settings.getPayoutMethod().name().equals("MPESA")).toList()).hasSize(1);
+        assertThat(payoutSettingsRepository.findAll().stream()
+                .filter(settings -> settings.getPayoutMethod().name().equals("MPESA")).findFirst().orElseThrow()
+                .getPaystackRecipientCode()).isEqualTo(recipientCode);
+
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
+                                "payoutMethod", "MPESA", "mpesaPhone", "123"))))
+                .andExpect(status().isBadRequest());
+    }
+
     private String settings(String accountNumber) throws Exception {
         return objectMapper.writeValueAsString(Map.of("payoutMethod", "BANK_ACCOUNT", "settlementBankCode", "KEPSS-TEST",
                 "accountNumber", accountNumber, "accountName", "First Payout Account"));

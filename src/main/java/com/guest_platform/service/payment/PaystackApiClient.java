@@ -5,6 +5,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,8 @@ public class PaystackApiClient {
 
     private static final URI INITIALIZE_URI = URI.create("https://api.paystack.co/transaction/initialize");
     private static final URI SUBACCOUNT_URI = URI.create("https://api.paystack.co/subaccount");
+    private static final URI TRANSFER_RECIPIENT_URI = URI.create("https://api.paystack.co/transferrecipient");
+    private static final URI BANKS_URI = URI.create("https://api.paystack.co/bank?country=kenya");
     private static final String SUBACCOUNT_UPDATE_URI = "https://api.paystack.co/subaccount/";
     private static final String VERIFY_URI = "https://api.paystack.co/transaction/verify/";
 
@@ -72,6 +75,27 @@ public class PaystackApiClient {
         return subaccountCode(successfulData(send(URI.create(SUBACCOUNT_UPDATE_URI
                 + java.net.URLEncoder.encode(subaccountCode, java.nio.charset.StandardCharsets.UTF_8)), "PUT", write(request)),
                 "Unable to update Paystack payout destination"));
+    }
+
+    public String createTransferRecipient(TransferRecipientRequest request) {
+        return recipientCode(successfulData(send(TRANSFER_RECIPIENT_URI, "POST", write(request)),
+                "Unable to create Paystack M-Pesa payout destination"));
+    }
+
+    public List<Bank> listKenyanBanks() {
+        JsonNode data = successfulData(send(BANKS_URI, "GET", null), "Unable to list Paystack banks");
+        if (!data.isArray()) {
+            throw new IllegalStateException("Paystack bank response was invalid");
+        }
+        java.util.ArrayList<Bank> banks = new java.util.ArrayList<>();
+        for (JsonNode bank : data) {
+            String code = requiredText(bank, "code");
+            String name = requiredText(bank, "name");
+            if (bank.path("active").asBoolean(true)) {
+                banks.add(new Bank(code, name));
+            }
+        }
+        return banks;
     }
 
     private JsonNode send(URI uri, String method, String body) {
@@ -135,6 +159,10 @@ public class PaystackApiClient {
         return requiredText(data, "subaccount_code");
     }
 
+    private String recipientCode(JsonNode data) {
+        return requiredText(data, "recipient_code");
+    }
+
     public record InitializeRequest(String email, String amount, String currency, String reference, String callback_url,
             String metadata, String subaccount, Long transaction_charge, String bearer) {
     }
@@ -147,5 +175,12 @@ public class PaystackApiClient {
     }
 
     public record SubaccountRequest(String business_name, String bank_code, String account_number, String description) {
+    }
+
+    public record TransferRecipientRequest(String type, String name, String account_number, String bank_code,
+            String currency) {
+    }
+
+    public record Bank(String code, String name) {
     }
 }

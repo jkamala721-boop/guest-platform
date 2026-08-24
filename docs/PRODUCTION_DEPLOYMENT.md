@@ -60,7 +60,7 @@ integration is disabled.
 ## Migrations and deploy safety
 
 - Flyway runs during application startup, before Render observes a healthy application.
-- V1--V18 are immutable. Every later schema change receives a new versioned migration; never edit an applied file.
+- V1--V19 are immutable. Every later schema change receives a new versioned migration; never edit an applied file.
 - Flyway validates applied migrations and has `clean` disabled in production.
 - A migration failure fails the new deploy; Render keeps the last successful deployment running. Investigate the
   Flyway error and `flyway_schema_history` before retrying.
@@ -101,3 +101,16 @@ https://guest-platform.onrender.com/api/webhooks/paystack
 Paystack's `x-paystack-signature` is validated against `PAYSTACK_SECRET_KEY`. In live mode, Hostvero additionally
 calls Paystack's server-side transaction verification endpoint before the shared payment-completion flow runs. A
 browser callback only returns the guest to the secure link; it never confirms the booking.
+
+### Host payout destinations
+
+For a Kenyan **bank account**, Hostvero obtains the supported-bank list from Paystack and creates a Paystack
+subaccount. The checkout split assigns the booking amount to that subaccount and keeps Paystack processing fees on the
+main Hostvero account.
+
+For an individual **M-Pesa** destination, Paystack uses a distinct `mobile_money` transfer-recipient model with the
+`MPESA` code; it is not a subaccount settlement destination. Hostvero creates the recipient when the host saves the
+destination, stores only a keyed fingerprint and masked final four digits, then creates one independent `PENDING`
+payout record after a verified guest payment. It does not initiate a transfer within the payment webhook because
+Paystack transfer balance/settlement availability must be reconciled independently. A failed or delayed host payout
+therefore never reverses an already verified guest payment, booking, receipt, or guest link.

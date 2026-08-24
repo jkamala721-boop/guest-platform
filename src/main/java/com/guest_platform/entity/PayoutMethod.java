@@ -1,6 +1,7 @@
 package com.guest_platform.entity;
 
-/** The only payout destination currently supported for a Paystack subaccount. */
+/** A bank destination settles through a Paystack subaccount; M-Pesa uses a transfer recipient. */
 public enum PayoutMethod {
-    BANK_ACCOUNT
+    BANK_ACCOUNT,
+    MPESA
 }
