@@ -1,5 +1,6 @@
 package com.guest_platform.service;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,8 @@ import com.guest_platform.service.payment.PaystackApiClient;
 /** Isolates Paystack subaccount provisioning from host settings and payment completion. */
 @Service
 public class PaystackSubaccountService {
+    /** Required by Paystack at setup; each transaction's flat charge overrides this default. */
+    static final BigDecimal NEUTRAL_PERCENTAGE_CHARGE = BigDecimal.ZERO;
 
     private final String mode;
     private final String secretKey;
@@ -38,7 +41,7 @@ public class PaystackSubaccountService {
         }
         PaystackApiClient.SubaccountRequest payload = new PaystackApiClient.SubaccountRequest(
                 host.getFullName(), request.settlementBankCode().trim(), request.accountNumber().trim(),
-                "Hostvero host payout destination");
+                NEUTRAL_PERCENTAGE_CHARGE, "Hostvero host payout destination");
         return existing == null || existing.getPaystackSubaccountCode() == null
                 ? paystackApiClient.createSubaccount(payload)
                 : paystackApiClient.updateSubaccount(existing.getPaystackSubaccountCode(), payload);

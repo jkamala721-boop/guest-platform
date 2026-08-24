@@ -212,7 +212,8 @@ public class PaystackApiClient {
             Long processorFeeMinor) {
     }
 
-    public record SubaccountRequest(String business_name, String bank_code, String account_number, String description) {
+    public record SubaccountRequest(String business_name, String bank_code, String account_number,
+            java.math.BigDecimal percentage_charge, String description) {
     }
 
     public record TransferRecipientRequest(String type, String name, String account_number, String bank_code,
