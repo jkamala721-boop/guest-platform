@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import com.guest_platform.entity.HostPayoutStatus;
 import com.guest_platform.repository.HostPayoutRepository;
+import com.guest_platform.service.HostPayoutExecutionService;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -43,6 +44,7 @@ class PaystackIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private HostPayoutRepository hostPayoutRepository;
+    @Autowired private HostPayoutExecutionService hostPayoutExecutionService;
     private int bookingOffset;
 
     @Test
@@ -218,6 +220,74 @@ class PaystackIntegrationTest {
                 .isPresent();
     }
 
+    @Test
+    void mpesaPayoutIsExecutedOutsideGuestWebhookAndSignedTransferEventsReconcileItOnce() throws Exception {
+        String hostToken = register("paystack-transfer@example.com", "M-Pesa Transfer Host");
+        configureMpesaPayout(hostToken);
+        String propertyId = createProperty(hostToken, "M-Pesa Transfer Property");
+        String guestId = createGuest(hostToken, "M-Pesa Transfer Guest");
+        String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
+        JsonNode payment = initiate(hostToken, bookingId);
+
+        String paymentSuccess = successPayload(payment, bookingId, 367500L, "KES", 1008L);
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(paymentSuccess))
+                        .contentType(MediaType.APPLICATION_JSON).content(paymentSuccess))
+                .andExpect(status().isNoContent());
+        var created = hostPayoutRepository.findByPaymentId(java.util.UUID.fromString(payment.get("id").asText()))
+                .orElseThrow();
+        assertThat(created.getStatus()).isEqualTo(HostPayoutStatus.PENDING);
+        assertThat(created.getTransferCode()).isNull();
+
+        hostPayoutExecutionService.reconcilePayouts();
+        var processing = hostPayoutRepository.findById(created.getId()).orElseThrow();
+        assertThat(processing.getStatus()).isEqualTo(HostPayoutStatus.PROCESSING);
+        assertThat(processing.getTransferCode()).startsWith("TRF_MOCK_");
+        String transferCode = processing.getTransferCode();
+        hostPayoutExecutionService.reconcilePayouts();
+        assertThat(hostPayoutRepository.findById(created.getId()).orElseThrow().getTransferCode()).isEqualTo(transferCode);
+
+        String transferSuccess = transferPayload("transfer.success", processing.getProviderReference(), transferCode);
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(transferSuccess))
+                        .contentType(MediaType.APPLICATION_JSON).content(transferSuccess))
+                .andExpect(status().isNoContent());
+        assertThat(hostPayoutRepository.findById(created.getId()).orElseThrow().getStatus()).isEqualTo(HostPayoutStatus.PAID);
+        mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(transferSuccess))
+                        .contentType(MediaType.APPLICATION_JSON).content(transferSuccess))
+                .andExpect(status().isNoContent());
+        assertThat(hostPayoutRepository.findById(created.getId()).orElseThrow().getStatus()).isEqualTo(HostPayoutStatus.PAID);
+    }
+
+    @Test
+    void failedMpesaPayoutNeverReversesTheVerifiedGuestPaymentOrStay() throws Exception {
+        String hostToken = register("paystack-transfer-fail@example.com", "M-Pesa Transfer Failure Host");
+        configureMpesaPayout(hostToken);
+        String propertyId = createProperty(hostToken, "M-Pesa Transfer Failure Property");
+        String guestId = createGuest(hostToken, "M-Pesa Transfer Failure Guest");
+        String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
+        String guestToken = createGuestLink(hostToken, bookingId);
+        JsonNode payment = initiate(hostToken, bookingId);
+        String paymentSuccess = successPayload(payment, bookingId, 367500L, "KES", 1009L);
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(paymentSuccess))
+                        .contentType(MediaType.APPLICATION_JSON).content(paymentSuccess))
+                .andExpect(status().isNoContent());
+        var payout = hostPayoutRepository.findByPaymentId(java.util.UUID.fromString(payment.get("id").asText()))
+                .orElseThrow();
+        hostPayoutExecutionService.reconcilePayouts();
+        var processing = hostPayoutRepository.findById(payout.getId()).orElseThrow();
+        String transferFailure = transferPayload("transfer.failed", processing.getProviderReference(), processing.getTransferCode());
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(transferFailure))
+                        .contentType(MediaType.APPLICATION_JSON).content(transferFailure))
+                .andExpect(status().isNoContent());
+        assertThat(hostPayoutRepository.findById(payout.getId()).orElseThrow().getStatus()).isEqualTo(HostPayoutStatus.FAILED);
+        mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
+        mockMvc.perform(get("/api/public/guest/{token}", guestToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.state").value("STAY_ACTIVE"));
+    }
+
     private JsonNode initiate(String token, String bookingId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId)
                         .header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
@@ -242,6 +312,11 @@ class PaystackIntegrationTest {
         data.put("fees", processorFeeMinor);
         data.put("metadata", Map.of("paymentId", payment.get("id").asText(), "bookingId", bookingId));
         return objectMapper.writeValueAsString(Map.of("event", "charge.success", "data", data));
+    }
+
+    private String transferPayload(String event, String reference, String transferCode) throws Exception {
+        return objectMapper.writeValueAsString(Map.of("event", event, "data", Map.of("reference", reference,
+                "transfer_code", transferCode, "status", event.substring("transfer.".length()))));
     }
 
     private String paystackSignature(String payload) throws Exception {

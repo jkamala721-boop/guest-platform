@@ -114,3 +114,12 @@ destination, stores only a keyed fingerprint and masked final four digits, then 
 payout record after a verified guest payment. It does not initiate a transfer within the payment webhook because
 Paystack transfer balance/settlement availability must be reconciled independently. A failed or delayed host payout
 therefore never reverses an already verified guest payment, booking, receipt, or guest link.
+
+### M-Pesa payout reconciliation
+
+For M-Pesa destinations, configure Paystack Transfers for the platform account and retain the standard signed Paystack
+webhook URL. Hostvero waits for `HOST_PAYOUT_SETTLEMENT_HOLD_MINUTES` (24 hours by default), checks the available KES
+balance, and then submits a single transfer using the payout's durable Hostvero reference. The worker runs every five
+minutes by default and can be paused with `HOST_PAYOUT_SCHEDULER_ENABLED=false` for maintenance. Paystack transfer
+success, failure, and reversal events are verified using the existing HMAC-SHA512 webhook signature. A failed or
+reversed host transfer does not alter the successful guest payment or confirmed stay.

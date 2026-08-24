@@ -28,21 +28,31 @@ public class PaystackWebhookService {
     private final ObjectMapper objectMapper;
     private final PaystackApiClient paystackApiClient;
     private final PaymentService paymentService;
+    private final HostPayoutExecutionService hostPayoutExecutionService;
 
     public PaystackWebhookService(@Value("${app.payments.paystack.mode:mock}") String mode,
             @Value("${app.payments.paystack.secret-key:}") String secretKey, ObjectMapper objectMapper,
-            PaystackApiClient paystackApiClient, PaymentService paymentService) {
+            PaystackApiClient paystackApiClient, PaymentService paymentService,
+            HostPayoutExecutionService hostPayoutExecutionService) {
         this.mode = mode;
         this.secretKey = secretKey;
         this.objectMapper = objectMapper;
         this.paystackApiClient = paystackApiClient;
         this.paymentService = paymentService;
+        this.hostPayoutExecutionService = hostPayoutExecutionService;
     }
 
     public void process(String signature, String payload) {
         verifySignature(signature, payload);
         JsonNode root = parse(payload);
-        if (!"charge.success".equals(root.path("event").asText())) {
+        String event = root.path("event").asText();
+        if ("transfer.success".equals(event) || "transfer.failed".equals(event) || "transfer.reversed".equals(event)) {
+            JsonNode data = root.path("data");
+            hostPayoutExecutionService.processVerifiedTransferWebhook(event, requiredText(data, "reference"),
+                    optionalText(data, "transfer_code"));
+            return;
+        }
+        if (!"charge.success".equals(event)) {
             return;
         }
         JsonNode data = root.path("data");
@@ -119,6 +129,11 @@ public class PaystackWebhookService {
             throw new IllegalArgumentException("Invalid Paystack webhook payload");
         }
         return value;
+    }
+
+    private String optionalText(JsonNode node, String field) {
+        String value = node.path(field).asText();
+        return value == null || value.isBlank() ? null : value;
     }
 
     private long requiredLong(JsonNode node, String field) {

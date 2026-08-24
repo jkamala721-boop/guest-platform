@@ -22,9 +22,12 @@ public class PaystackApiClient {
     private static final URI INITIALIZE_URI = URI.create("https://api.paystack.co/transaction/initialize");
     private static final URI SUBACCOUNT_URI = URI.create("https://api.paystack.co/subaccount");
     private static final URI TRANSFER_RECIPIENT_URI = URI.create("https://api.paystack.co/transferrecipient");
+    private static final URI TRANSFER_URI = URI.create("https://api.paystack.co/transfer");
+    private static final URI BALANCE_URI = URI.create("https://api.paystack.co/balance");
     private static final URI BANKS_URI = URI.create("https://api.paystack.co/bank?country=kenya");
     private static final String SUBACCOUNT_UPDATE_URI = "https://api.paystack.co/subaccount/";
     private static final String VERIFY_URI = "https://api.paystack.co/transaction/verify/";
+    private static final String TRANSFER_VERIFY_URI = "https://api.paystack.co/transfer/verify/";
 
     private final String secretKey;
     private final ObjectMapper objectMapper;
@@ -80,6 +83,38 @@ public class PaystackApiClient {
     public String createTransferRecipient(TransferRecipientRequest request) {
         return recipientCode(successfulData(send(TRANSFER_RECIPIENT_URI, "POST", write(request)),
                 "Unable to create Paystack M-Pesa payout destination"));
+    }
+
+    /** Initiates a host payout. A queued response is intentionally not treated as a completed transfer. */
+    public TransferResult initiateTransfer(TransferRequest request) {
+        JsonNode data = successfulData(send(TRANSFER_URI, "POST", write(request)),
+                "Unable to initiate Paystack host payout");
+        return new TransferResult(requiredText(data, "reference"), requiredText(data, "transfer_code"),
+                requiredText(data, "status"));
+    }
+
+    /** Verifies an already-submitted transfer by its durable Hostvero reference. */
+    public TransferResult verifyTransfer(String reference) {
+        JsonNode data = successfulData(send(URI.create(TRANSFER_VERIFY_URI + java.net.URLEncoder.encode(reference,
+                java.nio.charset.StandardCharsets.UTF_8)), "GET", null), "Unable to verify Paystack host payout");
+        return new TransferResult(requiredText(data, "reference"), optionalText(data, "transfer_code"),
+                requiredText(data, "status"));
+    }
+
+    /** Paystack exposes only an integration-level balance, so it is a final availability gate after the settlement hold. */
+    public boolean hasAvailableBalance(String currency, long requiredAmountMinor) {
+        JsonNode data = successfulData(send(BALANCE_URI, "GET", null), "Unable to check Paystack balance");
+        if (!data.isArray()) {
+            throw new IllegalStateException("Paystack balance response was invalid");
+        }
+        for (JsonNode balance : data) {
+            if (currency.equalsIgnoreCase(optionalText(balance, "currency"))
+                    && balance.path("balance").canConvertToLong()
+                    && balance.path("balance").longValue() >= requiredAmountMinor) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public List<Bank> listKenyanBanks() {
@@ -150,6 +185,11 @@ public class PaystackApiClient {
         return value;
     }
 
+    private String optionalText(JsonNode node, String field) {
+        String value = node.path(field).asText();
+        return value == null || value.isBlank() ? null : value;
+    }
+
     private void requireSecret() {
         if (secretKey == null || secretKey.isBlank()) {
             throw new IllegalStateException("Paystack integration is not configured");
@@ -218,6 +258,13 @@ public class PaystackApiClient {
 
     public record TransferRecipientRequest(String type, String name, String account_number, String bank_code,
             String currency) {
+    }
+
+    public record TransferRequest(String source, long amount, String recipient, String reference, String reason,
+            String currency) {
+    }
+
+    public record TransferResult(String reference, String transferCode, String status) {
     }
 
     public record Bank(String code, String name) {
