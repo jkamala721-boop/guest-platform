@@ -112,7 +112,8 @@ public class PaystackApiClient {
             }
             HttpResponse<String> response = httpClient.send(request.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("Paystack request was rejected");
+                throw new PaystackRequestRejectedException(response.statusCode(),
+                        safeProviderMessage(response.body()));
             }
             return objectMapper.readTree(response.body());
         } catch (IOException exception) {
@@ -161,6 +162,43 @@ public class PaystackApiClient {
 
     private String recipientCode(JsonNode data) {
         return requiredText(data, "recipient_code");
+    }
+
+    static String safeProviderMessage(String body) {
+        try {
+            JsonNode response = new ObjectMapper().readTree(body);
+            String message = response.path("message").asText("").trim();
+            if (!message.isBlank()) {
+                return redactSensitiveNumbers(message.length() > 180 ? message.substring(0, 180) : message);
+            }
+        } catch (JacksonException ignored) {
+            // Provider did not return structured JSON; never surface its raw body.
+        }
+        return "Paystack rejected the request";
+    }
+
+    private static String redactSensitiveNumbers(String value) {
+        return value.replaceAll("(?<!\\d)(?:\\+?254|0)7\\d{8}(?!\\d)", "[redacted]")
+                .replaceAll("(?<!\\d)\\d{8,}(?!\\d)", "[redacted]");
+    }
+
+    public static final class PaystackRequestRejectedException extends RuntimeException {
+        private final int statusCode;
+        private final String providerMessage;
+
+        public PaystackRequestRejectedException(int statusCode, String providerMessage) {
+            super("Paystack request rejected: status=" + statusCode + ", message=" + providerMessage);
+            this.statusCode = statusCode;
+            this.providerMessage = providerMessage;
+        }
+
+        public int getStatusCode() {
+            return statusCode;
+        }
+
+        public String getProviderMessage() {
+            return providerMessage;
+        }
     }
 
     public record InitializeRequest(String email, String amount, String currency, String reference, String callback_url,

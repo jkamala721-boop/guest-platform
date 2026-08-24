@@ -3,6 +3,8 @@ package com.guest_platform.service;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.guest_platform.entity.Host;
@@ -11,6 +13,7 @@ import com.guest_platform.service.payment.PaystackApiClient;
 /** Provisions the documented Kenyan MPESA transfer-recipient model. */
 @Service
 public class PaystackTransferRecipientService {
+    private static final Logger log = LoggerFactory.getLogger(PaystackTransferRecipientService.class);
     private final String mode;
     private final String secretKey;
     private final PaystackApiClient paystackApiClient;
@@ -32,7 +35,21 @@ public class PaystackTransferRecipientService {
         if (secretKey == null || secretKey.isBlank()) {
             throw new IllegalStateException("Paystack integration is not configured");
         }
-        return paystackApiClient.createTransferRecipient(new PaystackApiClient.TransferRecipientRequest(
-                "mobile_money", host.getFullName(), normalizedPhone, "MPESA", "KES"));
+        try {
+            return paystackApiClient.createTransferRecipient(new PaystackApiClient.TransferRecipientRequest(
+                    "mobile_money", host.getFullName(), paystackRecipientAccountNumber(normalizedPhone), "MPESA", "KES"));
+        } catch (PaystackApiClient.PaystackRequestRejectedException exception) {
+            log.warn("Paystack M-Pesa transfer recipient rejected: status={}, message={}",
+                    exception.getStatusCode(), exception.getProviderMessage());
+            throw new IllegalArgumentException("Paystack rejected the M-Pesa payout destination. Check the number and try again.");
+        }
+    }
+
+    /** Paystack's Kenya transfer-recipient example uses the local 07XXXXXXXX account-number form. */
+    static String paystackRecipientAccountNumber(String canonicalPhone) {
+        if (canonicalPhone == null || !canonicalPhone.matches("\\+2547\\d{8}")) {
+            throw new IllegalArgumentException("M-Pesa phone number must be a Kenyan mobile number");
+        }
+        return "0" + canonicalPhone.substring(4);
     }
 }
