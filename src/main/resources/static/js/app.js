@@ -5416,7 +5416,7 @@ function renderPaymentStay(result) {
             <select id="public-payment-provider" name="provider"><option value="PAYSTACK">Paystack — M-Pesa or card</option><option value="STRIPE">Stripe</option></select>
           </div>
           <div class="public-summary" data-paystack-fee>
-            <div class="public-summary-item"><span>Hostvero service fee (5%) <button class="button secondary" type="button" id="service-fee-explanation">Why is there a service fee?</button></span><strong>${formatMoney(result.payment.paystackServiceFee, result.payment.currency)}</strong></div>
+            <div class="public-summary-item"><span>Hostvero service fee 5%</span><button class="fee-help-link" type="button" id="service-fee-explanation" aria-expanded="false" aria-controls="service-fee-popover">Why this fee?</button><div class="fee-help-popover" id="service-fee-popover" role="status" hidden>This fee helps support secure payments, booking protection, and support if a reservation problem comes up.</div><strong>${formatMoney(result.payment.paystackServiceFee, result.payment.currency)}</strong></div>
             <div class="public-summary-item"><span>Total with Paystack</span><strong>${formatMoney(result.payment.paystackTotal, result.payment.currency)}</strong></div>
           </div>
           <div class="public-form-actions"><button class="button" type="submit">Pay securely</button></div>
@@ -5774,7 +5774,26 @@ function bindPublicForms() {
     });
   });
 
-  $('#service-fee-explanation')?.addEventListener('click', () => openModal({ title: 'Why Hostvero charges a service fee', body: '<p class="muted">The 5% service fee helps Hostvero provide secure payment processing, booking protection and fraud-prevention measures, and support when something goes wrong with a reservation. The host\'s listed accommodation price is shown separately.</p>' }));
+  $('#service-fee-explanation')?.addEventListener('click', event => {
+    const button = event.currentTarget;
+    const popover = $('#service-fee-popover');
+    const close = () => {
+      popover.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      button._feePopoverController?.abort();
+      button._feePopoverController = null;
+    };
+    if (!popover.hidden) { close(); return; }
+    button._feePopoverController?.abort();
+    popover.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    const controller = new AbortController();
+    button._feePopoverController = controller;
+    document.addEventListener('pointerdown', outsideEvent => {
+      if (!popover.contains(outsideEvent.target) && outsideEvent.target !== button) close();
+    }, { signal: controller.signal });
+    document.addEventListener('keydown', keyEvent => { if (keyEvent.key === 'Escape') { close(); button.focus(); } }, { signal: controller.signal });
+  });
   $('[data-show-access-code]')?.addEventListener('click', event => { const button = event.currentTarget; button.textContent = button.dataset.code; button.disabled = true; });
 
   $('#public-email-verification')?.addEventListener('submit', async event => {

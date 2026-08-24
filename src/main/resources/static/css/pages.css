@@ -2472,3 +2472,33 @@
   font-size:
     .68rem;
 }
+
+.fee-help-link {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--hv-text-muted);
+  font: inherit;
+  font-size: .68rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.fee-help-link:focus-visible {
+  outline: 2px solid var(--hv-primary);
+  outline-offset: 2px;
+}
+
+.fee-help-popover {
+  max-width: 16rem;
+  padding: .55rem .65rem;
+  border: 1px solid var(--hv-border-soft);
+  border-radius: .45rem;
+  background: var(--hv-surface);
+  color: var(--hv-text-muted);
+  font-size: .72rem;
+  line-height: 1.35;
+  box-shadow: 0 .35rem .9rem rgba(15, 41, 55, .12);
+}
