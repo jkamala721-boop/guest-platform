@@ -3818,7 +3818,10 @@ async function renderSettings() {
   bindShell();
 
   try {
-    const host = await get('/api/me');
+    const [host, payoutSettings] = await Promise.all([
+      get('/api/me'),
+      get('/api/me/payout-settings')
+    ]);
 
     state.host = host;
 
@@ -3911,6 +3914,43 @@ async function renderSettings() {
       </form>
     `;
 
+    const payoutForm = `
+      <form id="payout-settings-form" class="settings-profile-form">
+        <div class="settings-form-grid">
+          <div class="field">
+            <label for="payout-method">Payout method</label>
+            <input id="payout-method" readonly value="Bank account">
+            <input name="payoutMethod" type="hidden" value="BANK_ACCOUNT">
+          </div>
+          <div class="field">
+            <label for="settlement-bank-code">Settlement bank code</label>
+            <input id="settlement-bank-code" name="settlementBankCode" required maxlength="80"
+              value="${escapeHtml(payoutSettings.settlementBankCode || '')}">
+          </div>
+          <div class="field">
+            <label for="payout-account-number">Account number</label>
+            <input id="payout-account-number" name="accountNumber" required inputmode="numeric"
+              pattern="[0-9]{5,34}" maxlength="34" autocomplete="off">
+            <span class="help">${payoutSettings.maskedAccountNumber
+              ? `Current destination: ${escapeHtml(payoutSettings.maskedAccountNumber)}. Re-enter the full number to update it.`
+              : 'This number is sent securely to Paystack and is not stored by Hostvero.'}</span>
+          </div>
+          <div class="field">
+            <label for="payout-account-name">Account name</label>
+            <input id="payout-account-name" name="accountName" required maxlength="160"
+              value="${escapeHtml(payoutSettings.accountName || '')}">
+          </div>
+        </div>
+        <div class="settings-form-footer">
+          <div>
+            <strong>Paystack payout destination</strong>
+            <span>Paystack settles the booking amount to this account. Hostvero keeps only the service-fee remainder after processing costs.</span>
+          </div>
+          <button class="button" type="submit">Save payout settings</button>
+        </div>
+      </form>
+    `;
+
 
     const content = `
       ${heading(
@@ -3949,6 +3989,38 @@ async function renderSettings() {
           </header>
 
           ${accountForm}
+
+        </article>
+
+
+        <!-- PAYOUT SETTINGS -->
+
+        <article class="card settings-card">
+
+          <header class="settings-card-header">
+
+            <div>
+
+              <span class="settings-icon">
+                ${icons.payments}
+              </span>
+
+              <div>
+                <h2>Payout settings</h2>
+                <p>
+                  Where Paystack settles your booking amount.
+                </p>
+              </div>
+
+            </div>
+
+            <span class="settings-pill">
+              ${payoutSettings.configured ? 'Configured' : 'Not configured'}
+            </span>
+
+          </header>
+
+          ${payoutForm}
 
         </article>
 
@@ -4261,6 +4333,24 @@ async function renderSettings() {
 
         }
 
+      }
+    );
+
+    $('#payout-settings-form').addEventListener(
+      'submit',
+      async event => {
+        event.preventDefault();
+        const button = $('button[type="submit"]', event.currentTarget);
+        setButtonBusy(button, true, 'Saving…');
+        try {
+          await put('/api/me/payout-settings', Object.fromEntries(new FormData(event.currentTarget)));
+          toast('Payout settings saved.', 'success');
+          renderSettings();
+        } catch (error) {
+          handleFormError(error, event.currentTarget);
+        } finally {
+          setButtonBusy(button, false);
+        }
       }
     );
 

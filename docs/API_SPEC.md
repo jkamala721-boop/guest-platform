@@ -88,6 +88,18 @@ Public guest endpoints must validate the secure token and booking state.
 
 ## 7. Payments
 
+GET /api/me/payout-settings
+
+Returns only the authenticated host's payout configuration. Bank account numbers are masked and Paystack
+subaccount references are never returned.
+
+PUT /api/me/payout-settings
+
+Creates or updates the authenticated host's Paystack payout destination. The request accepts only a bank-account
+method, Paystack settlement-bank code, full account number and account name. Hostvero uses the full number only for
+the provider request and persists only its final four digits. A configured destination is required before a Paystack
+booking payment can begin.
+
 POST /api/payments/mpesa/initiate
 
 POST /api/payments/stripe/create
@@ -104,6 +116,9 @@ POST /api/webhooks/paystack
 
 Paystack checkout is initialized through the existing booking payment endpoint using
 `{"provider":"PAYSTACK"}`. The browser receives only the Paystack authorization URL; the webhook is authoritative.
+For a host with configured payout settings, Hostvero submits that host's Paystack subaccount plus a flat
+`transaction_charge` equal to the server-calculated Hostvero service fee. Paystack's main account bears processor
+fees; the host subaccount settlement target remains the booking amount.
 
 Do not mark a payment successful from a browser-only response.
 

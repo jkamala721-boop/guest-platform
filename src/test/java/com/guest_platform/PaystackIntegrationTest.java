@@ -3,6 +3,7 @@ package com.guest_platform;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,6 +43,7 @@ class PaystackIntegrationTest {
     @Test
     void initiationUsesServerCalculatedFivePercentFeeAndNeverClientAmounts() throws Exception {
         String hostToken = register("paystack-init@example.com", "Paystack Host");
+        configurePayout(hostToken);
         String propertyId = createProperty(hostToken, "Paystack Property");
         String guestId = createGuest(hostToken, "Paystack Guest");
         String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
@@ -65,6 +67,7 @@ class PaystackIntegrationTest {
     @Test
     void verifiedPaystackWebhookCompletesOnceAndRejectsInvalidOrMismatchedEvents() throws Exception {
         String hostToken = register("paystack-webhook@example.com", "Webhook Host");
+        configurePayout(hostToken);
         String propertyId = createProperty(hostToken, "Webhook Property");
         String guestId = createGuest(hostToken, "Webhook Guest");
         String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
@@ -81,6 +84,11 @@ class PaystackIntegrationTest {
         mockMvc.perform(get("/api/payments/{paymentId}", payment.get("id").asText())
                         .header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUCCEEDED"));
+        mockMvc.perform(get("/api/payments/{paymentId}", payment.get("id").asText())
+                        .header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.processorFee").value(55.00))
+                .andExpect(jsonPath("$.hostPayoutAmount").value(3500.00))
+                .andExpect(jsonPath("$.hostveroNetAmount").value(120.00));
         mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
         mockMvc.perform(get("/api/public/guest/{token}", guestToken))
@@ -120,6 +128,7 @@ class PaystackIntegrationTest {
     @Test
     void latePaystackSuccessAfterCancellationCannotRestoreBookingOrGuestLink() throws Exception {
         String hostToken = register("paystack-cancel@example.com", "Cancellation Host");
+        configurePayout(hostToken);
         String propertyId = createProperty(hostToken, "Cancellation Property");
         String guestId = createGuest(hostToken, "Cancellation Guest");
         String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
@@ -156,6 +165,26 @@ class PaystackIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    @Test
+    void processorFeeAboveServiceFeeIsRecordedAsNegativePlatformNetWithoutReducingHostPayout() throws Exception {
+        String hostToken = register("paystack-negative-net@example.com", "Negative Net Host");
+        configurePayout(hostToken);
+        String propertyId = createProperty(hostToken, "Negative Net Property");
+        String guestId = createGuest(hostToken, "Negative Net Guest");
+        String bookingId = createBooking(hostToken, propertyId, guestId, new BigDecimal("3500.00"));
+        JsonNode payment = initiate(hostToken, bookingId);
+        String payload = successPayload(payment, bookingId, 367500L, "KES", 1006L, 20000L);
+
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(payload))
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/payments/{paymentId}", payment.get("id").asText())
+                        .header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.processorFee").value(200.00))
+                .andExpect(jsonPath("$.hostPayoutAmount").value(3500.00))
+                .andExpect(jsonPath("$.hostveroNetAmount").value(-25.00));
+    }
+
     private JsonNode initiate(String token, String bookingId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId)
                         .header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
@@ -166,12 +195,18 @@ class PaystackIntegrationTest {
 
     private String successPayload(JsonNode payment, String bookingId, long amount, String currency, long transactionId)
             throws Exception {
+        return successPayload(payment, bookingId, amount, currency, transactionId, 5500L);
+    }
+
+    private String successPayload(JsonNode payment, String bookingId, long amount, String currency, long transactionId,
+            long processorFeeMinor) throws Exception {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", transactionId);
         data.put("status", "success");
         data.put("reference", payment.get("providerReference").asText());
         data.put("amount", amount);
         data.put("currency", currency);
+        data.put("fees", processorFeeMinor);
         data.put("metadata", Map.of("paymentId", payment.get("id").asText(), "bookingId", bookingId));
         return objectMapper.writeValueAsString(Map.of("event", "charge.success", "data", data));
     }
@@ -180,6 +215,14 @@ class PaystackIntegrationTest {
         Mac mac = Mac.getInstance("HmacSHA512");
         mac.init(new SecretKeySpec(PAYSTACK_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
         return java.util.HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private void configurePayout(String token) throws Exception {
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
+                                "payoutMethod", "BANK_ACCOUNT", "settlementBankCode", "KEPSS-TEST",
+                                "accountNumber", "0123456789", "accountName", "Paystack Host Account"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true));
     }
 
     private String register(String email, String fullName) throws Exception {

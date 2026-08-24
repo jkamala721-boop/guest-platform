@@ -60,7 +60,7 @@ integration is disabled.
 ## Migrations and deploy safety
 
 - Flyway runs during application startup, before Render observes a healthy application.
-- V1--V16 are immutable. Every later schema change receives a new versioned migration; never edit an applied file.
+- V1--V18 are immutable. Every later schema change receives a new versioned migration; never edit an applied file.
 - Flyway validates applied migrations and has `clean` disabled in production.
 - A migration failure fails the new deploy; Render keeps the last successful deployment running. Investigate the
   Flyway error and `flyway_schema_history` before retrying.
@@ -89,7 +89,8 @@ approval, and the required post-restore credential rotation before any productio
 
 Hostvero initializes Paystack transactions from the backend and redirects guests to Paystack's hosted checkout. The
 guest is charged the booking amount plus a server-calculated 5% Hostvero service fee; cash payments never receive that
-fee. Flyway V17 stores the booking amount and fee separately from the charged payment amount for auditability.
+fee. Flyway V17 stores the booking amount and fee separately from the charged payment amount for auditability. Flyway
+V18 adds host payout destinations and provider-fee/settlement accounting for Paystack subaccount payments.
 
 Configure the Paystack Dashboard webhook URL as:
 

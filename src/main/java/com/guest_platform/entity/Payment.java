@@ -57,6 +57,15 @@ public class Payment {
     @Column(name = "service_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal serviceFee;
 
+    @Column(name = "processor_fee", precision = 12, scale = 2)
+    private BigDecimal processorFee;
+
+    @Column(name = "host_payout_amount", precision = 12, scale = 2)
+    private BigDecimal hostPayoutAmount;
+
+    @Column(name = "hostvero_net_amount", precision = 12, scale = 2)
+    private BigDecimal hostveroNetAmount;
+
     @Column(nullable = false, length = 3)
     private String currency;
 
@@ -166,6 +175,17 @@ public class Payment {
         this.providerReference = providerReference;
     }
 
+    /** Records provider-reported economics; the host payout is never reduced by processor fees. */
+    public void recordPaystackSettlement(BigDecimal actualProcessorFee) {
+        if (provider != PaymentProvider.PAYSTACK || actualProcessorFee == null
+                || actualProcessorFee.signum() < 0) {
+            throw new IllegalArgumentException("Invalid Paystack settlement accounting");
+        }
+        processorFee = actualProcessorFee;
+        hostPayoutAmount = bookingAmount;
+        hostveroNetAmount = serviceFee.subtract(actualProcessorFee);
+    }
+
     public UUID getId() { return id; }
     public Host getHost() { return host; }
     public Booking getBooking() { return booking; }
@@ -176,6 +196,9 @@ public class Payment {
     public BigDecimal getAmount() { return amount; }
     public BigDecimal getBookingAmount() { return bookingAmount; }
     public BigDecimal getServiceFee() { return serviceFee; }
+    public BigDecimal getProcessorFee() { return processorFee; }
+    public BigDecimal getHostPayoutAmount() { return hostPayoutAmount; }
+    public BigDecimal getHostveroNetAmount() { return hostveroNetAmount; }
     public String getCurrency() { return currency; }
     public PaymentStatus getStatus() { return status; }
     public String getFailureReason() { return failureReason; }

@@ -41,7 +41,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
-        "app.guest-email-verification.code-ttl-seconds=1",
+        "app.guest-email-verification.code-ttl-seconds=2",
         "app.guest-email-verification.resend-cooldown-seconds=1",
         "app.guest-email-verification.maximum-attempts=5" })
 @AutoConfigureMockMvc
@@ -95,7 +95,7 @@ class GuestEmailVerificationIntegrationTest {
         String wrongCode = "000000".equals(code) ? "000001" : "000000";
 
         confirm(session.guestToken(), wrongCode).andExpect(status().isConflict());
-        Thread.sleep(1_100);
+        Thread.sleep(2_100);
         confirm(session.guestToken(), code).andExpect(status().isConflict());
     }
 
@@ -106,7 +106,7 @@ class GuestEmailVerificationIntegrationTest {
         mockMvc.perform(post("/api/public/guest/{token}/email-verification", session.guestToken()))
                 .andExpect(status().isConflict());
 
-        Thread.sleep(1_100);
+        Thread.sleep(2_100);
         String secondCode = requestCode(session);
         assertNotEquals(firstCode, secondCode);
         confirm(session.guestToken(), firstCode).andExpect(status().isConflict());

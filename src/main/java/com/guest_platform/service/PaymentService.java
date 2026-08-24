@@ -42,13 +42,14 @@ public class PaymentService {
     private final NotificationService notificationService;
     private final BookingExtensionRepository bookingExtensionRepository;
     private final BookingExtensionService bookingExtensionService;
+    private final HostPayoutSettingsService hostPayoutSettingsService;
     private final Map<PaymentProvider, PaymentProviderAdapter> providers;
     private final String publicBaseUrl;
 
     public PaymentService(BookingRepository bookingRepository, PaymentRepository paymentRepository,
             ReceiptService receiptService, GuestLinkService guestLinkService, NotificationService notificationService,
             BookingExtensionRepository bookingExtensionRepository, BookingExtensionService bookingExtensionService,
-            List<PaymentProviderAdapter> providerAdapters,
+            HostPayoutSettingsService hostPayoutSettingsService, List<PaymentProviderAdapter> providerAdapters,
             @Value("${app.public-base-url:http://localhost:8080}") String publicBaseUrl) {
         this.bookingRepository = bookingRepository;
         this.paymentRepository = paymentRepository;
@@ -57,6 +58,7 @@ public class PaymentService {
         this.notificationService = notificationService;
         this.bookingExtensionRepository = bookingExtensionRepository;
         this.bookingExtensionService = bookingExtensionService;
+        this.hostPayoutSettingsService = hostPayoutSettingsService;
         this.providers = providerAdapters.stream().collect(Collectors.toMap(PaymentProviderAdapter::provider,
                 Function.identity(), (first, ignored) -> first, () -> new EnumMap<>(PaymentProvider.class)));
         this.publicBaseUrl = trimTrailingSlash(publicBaseUrl);
@@ -192,6 +194,9 @@ public class PaymentService {
             throw new ResourceNotFoundException("Payment was not found");
         }
         verifyPaystackAmount(payment, request.amountMinor(), request.currency());
+        if (request.processorFeeMinor() != null) {
+            payment.recordPaystackSettlement(fromMinorUnits(request.processorFeeMinor()));
+        }
         completeVerifiedPayment(payment, requireValue(request.eventId(), "eventId"));
         return PaymentResponse.from(payment);
     }
@@ -211,6 +216,9 @@ public class PaymentService {
         BigDecimal bookingAmount = extension == null ? booking.getTotalAmount() : extension.getAdditionalAmount();
         String currency = extension == null ? booking.getCurrency() : extension.getCurrency();
         PaymentAmounts amounts = paymentAmounts(request.provider(), bookingAmount);
+        String paystackSubaccountCode = request.provider() == PaymentProvider.PAYSTACK
+                ? hostPayoutSettingsService.requireConfiguredPaystackSubaccount(booking.getHost().getId())
+                : null;
         String customerEmail = booking.getGuest() == null ? null : booking.getGuest().getEmail();
         if (request.provider() == PaymentProvider.PAYSTACK && (customerEmail == null || customerEmail.isBlank())) {
             throw new ConflictException("A guest email is required for Paystack payment");
@@ -223,7 +231,8 @@ public class PaymentService {
         payment = paymentRepository.saveAndFlush(payment);
         PaymentProviderAdapter.PaymentInitiation initiation = provider.initiate(
                 new PaymentProviderAdapter.PaymentInitiationRequest(payment.getId(), booking.getId(),
-                        amounts.chargedAmount(), currency, returnUrl, customerEmail));
+                        amounts.chargedAmount(), currency, returnUrl, customerEmail, paystackSubaccountCode,
+                        request.provider() == PaymentProvider.PAYSTACK ? amounts.serviceFee() : null));
         payment.setProviderReference(requireValue(initiation.providerReference(), "providerReference"));
         return PaymentInitiationResponse.from(payment, initiation.nextAction());
     }
@@ -287,6 +296,13 @@ public class PaymentService {
         }
     }
 
+    private BigDecimal fromMinorUnits(long amountMinor) {
+        if (amountMinor < 0) {
+            throw new ConflictException("Paystack transaction did not match the booking");
+        }
+        return BigDecimal.valueOf(amountMinor, 2);
+    }
+
     private PaymentAmounts paymentAmounts(PaymentProvider provider, BigDecimal bookingAmount) {
         if (provider != PaymentProvider.PAYSTACK) {
             return new PaymentAmounts(bookingAmount, BigDecimal.ZERO, bookingAmount);
@@ -341,7 +357,7 @@ public class PaymentService {
     }
 
     public record PaystackWebhookPayment(UUID paymentId, UUID bookingId, String providerReference, String eventId,
-            Long amountMinor, String currency) {
+            Long amountMinor, String currency, Long processorFeeMinor) {
     }
 
     private record PaymentAmounts(BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount) {

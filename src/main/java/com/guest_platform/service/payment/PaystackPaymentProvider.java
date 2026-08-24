@@ -46,13 +46,18 @@ public class PaystackPaymentProvider implements PaymentProviderAdapter {
         if (request.customerEmail() == null || request.customerEmail().isBlank()) {
             throw new IllegalArgumentException("A guest email is required for Paystack payment");
         }
+        if (request.paystackSubaccountCode() == null || request.paystackSubaccountCode().isBlank()
+                || request.paystackTransactionCharge() == null) {
+            throw new IllegalStateException("Paystack payout settings are not configured");
+        }
 
         String reference = "HV-" + request.paymentId();
         PaystackApiClient.InitializeResult result = paystackApiClient.initialize(new PaystackApiClient.InitializeRequest(
                 request.customerEmail(), String.valueOf(toMinorUnits(request.amount())),
                 request.currency().toUpperCase(Locale.ROOT), reference, request.returnUrl(),
                 "{\"paymentId\":\"" + request.paymentId() + "\",\"bookingId\":\"" + request.bookingId()
-                        + "\"}"));
+                        + "\"}", request.paystackSubaccountCode(),
+                toMinorUnits(request.paystackTransactionCharge()), "account"));
         if (!reference.equals(result.reference())) {
             throw new IllegalStateException("Paystack returned an unexpected transaction reference");
         }

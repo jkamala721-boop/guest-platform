@@ -115,6 +115,8 @@ Booking many → one Guest
 
 Booking 1 → many Payments
 
+Host 1 → 0..1 HostPayoutSettings
+
 Booking 1 → one or more Receipts
 
 Booking 1 → one active GuestLink
@@ -145,6 +147,13 @@ Provider examples:
 
 For Paystack payments, retain the host booking amount, the Hostvero service fee, and the resulting charged amount as
 separate auditable values. The service fee must be server-calculated and is not applied to cash payments.
+
+`host_payout_settings` is keyed by `host_id` and retains only payout method, Paystack settlement-bank code, account
+name, the final four account-number digits, configuration status and the Paystack subaccount code. It never stores a
+full host bank-account number. Payment accounting additionally retains the provider-reported `processor_fee`, the
+unchanged `host_payout_amount` (the booking amount) and `hostvero_net_amount` (`service_fee - processor_fee`). The
+net amount may be negative when processing cost exceeds the service fee; that loss is never deducted from the host
+payout.
 
 ---
 

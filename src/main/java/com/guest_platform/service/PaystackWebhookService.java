@@ -49,6 +49,7 @@ public class PaystackWebhookService {
         String reference = requiredText(data, "reference");
         long amountMinor = requiredLong(data, "amount");
         String currency = requiredText(data, "currency");
+        Long processorFeeMinor = optionalLong(data, "fees");
         if (!"success".equalsIgnoreCase(requiredText(data, "status"))) {
             return;
         }
@@ -59,6 +60,7 @@ public class PaystackWebhookService {
                     || !currency.equalsIgnoreCase(verified.currency())) {
                 throw new ConflictException("Paystack transaction did not match the booking");
             }
+            processorFeeMinor = verified.processorFeeMinor();
         } else if (!"mock".equalsIgnoreCase(mode)) {
             throw new WebhookAuthenticationException();
         }
@@ -66,7 +68,7 @@ public class PaystackWebhookService {
         JsonNode metadata = metadata(data);
         paymentService.processVerifiedPaystackWebhook(new PaymentService.PaystackWebhookPayment(
                 uuid(metadata, "paymentId"), uuid(metadata, "bookingId"), reference,
-                "PAYSTACK-" + requiredText(data, "id"), amountMinor, currency));
+                "PAYSTACK-" + requiredText(data, "id"), amountMinor, currency, processorFeeMinor));
     }
 
     private void verifySignature(String signature, String payload) {
@@ -124,6 +126,10 @@ public class PaystackWebhookService {
             throw new IllegalArgumentException("Invalid Paystack webhook payload");
         }
         return node.path(field).longValue();
+    }
+
+    private Long optionalLong(JsonNode node, String field) {
+        return node.path(field).canConvertToLong() ? node.path(field).longValue() : null;
     }
 
     private byte[] hmac(String payload) {

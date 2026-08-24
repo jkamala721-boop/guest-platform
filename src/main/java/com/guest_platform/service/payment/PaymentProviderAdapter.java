@@ -15,6 +15,6 @@ public interface PaymentProviderAdapter {
     }
 
     record PaymentInitiationRequest(UUID paymentId, UUID bookingId, BigDecimal amount, String currency,
-            String returnUrl, String customerEmail) {
+            String returnUrl, String customerEmail, String paystackSubaccountCode, BigDecimal paystackTransactionCharge) {
     }
 }
