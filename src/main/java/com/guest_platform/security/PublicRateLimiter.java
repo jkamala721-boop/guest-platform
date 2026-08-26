@@ -23,7 +23,7 @@ import com.guest_platform.config.PublicRateLimitProperties.Limit;
 public class PublicRateLimiter {
 
     public enum Category {
-        LOGIN, REGISTRATION, GUEST_LINK, OTP_REQUEST, OTP_VERIFY, RETURNING_GUEST_LOOKUP, RETURNING_GUEST_VERIFY, PAYMENT_INITIALIZATION, PAYSTACK_WEBHOOK
+        LOGIN, ADMIN_LOGIN, REGISTRATION, GUEST_LINK, OTP_REQUEST, OTP_VERIFY, RETURNING_GUEST_LOOKUP, RETURNING_GUEST_VERIFY, PAYMENT_INITIALIZATION, PAYSTACK_WEBHOOK
     }
 
     public record Decision(boolean allowed, long retryAfterSeconds) {
@@ -96,6 +96,7 @@ public class PublicRateLimiter {
     private Map<Category, Policy> policies(PublicRateLimitProperties source) {
         Map<Category, Policy> result = new EnumMap<>(Category.class);
         result.put(Category.LOGIN, policy(source.getLogin(), 10, 900));
+        result.put(Category.ADMIN_LOGIN, policy(source.getAdminLogin(), 5, 900));
         result.put(Category.REGISTRATION, policy(source.getRegistration(), 5, 3600));
         result.put(Category.GUEST_LINK, policy(source.getGuestLink(), 120, 300));
         result.put(Category.OTP_REQUEST, policy(source.getOtpRequest(), 5, 900));

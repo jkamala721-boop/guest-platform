@@ -17,6 +17,8 @@ import com.guest_platform.exception.InvalidCredentialsException;
 import com.guest_platform.exception.GuestLinkExpiredException;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.exception.WebhookAuthenticationException;
+import com.guest_platform.exception.AdminInvalidCredentialsException;
+import com.guest_platform.exception.AdminAccountDisabledException;
 import com.guest_platform.service.payment.PaystackApiClient.PaystackRequestRejectedException;
 
 @RestControllerAdvice
@@ -36,6 +38,18 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiErrorResponse> invalidCredentials(InvalidCredentialsException exception) {
         return response(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS",
                 "Incorrect email/phone or password. Check your details and try again.", null, false, null);
+    }
+
+    @ExceptionHandler(AdminInvalidCredentialsException.class)
+    ResponseEntity<ApiErrorResponse> adminInvalidCredentials(AdminInvalidCredentialsException exception) {
+        return response(HttpStatus.UNAUTHORIZED, "ADMIN_INVALID_CREDENTIALS",
+                "Incorrect admin email or password.", null, false, null);
+    }
+
+    @ExceptionHandler(AdminAccountDisabledException.class)
+    ResponseEntity<ApiErrorResponse> adminDisabled(AdminAccountDisabledException exception) {
+        return response(HttpStatus.FORBIDDEN, "ADMIN_ACCOUNT_DISABLED",
+                "This admin account is disabled.", null, false, null);
     }
 
     @ExceptionHandler(ConflictException.class)

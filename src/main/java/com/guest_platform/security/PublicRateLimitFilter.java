@@ -57,6 +57,7 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         String ip = request.getRemoteAddr() == null || request.getRemoteAddr().isBlank() ? "unknown" : request.getRemoteAddr();
         if ("POST".equals(method) && "/api/auth/login".equals(path)) return Optional.of(new RequestLimit(Category.LOGIN, ip));
+        if ("POST".equals(method) && "/api/admin/auth/login".equals(path)) return Optional.of(new RequestLimit(Category.ADMIN_LOGIN, ip));
         if ("POST".equals(method) && "/api/auth/register".equals(path)) return Optional.of(new RequestLimit(Category.REGISTRATION, ip));
         if ("POST".equals(method) && "/api/webhooks/paystack".equals(path)) return Optional.of(new RequestLimit(Category.PAYSTACK_WEBHOOK, ip));
         Matcher guestPath = GUEST_TOKEN_PATH.matcher(path);

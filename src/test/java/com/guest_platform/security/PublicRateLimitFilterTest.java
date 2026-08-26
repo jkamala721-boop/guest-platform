@@ -23,6 +23,7 @@ class PublicRateLimitFilterTest {
         PublicRateLimitFilter filter = filterWithOneRequestLimit();
 
         assertRateLimited(filter, "POST", "/api/auth/login");
+        assertRateLimited(filter, "POST", "/api/admin/auth/login");
         assertRateLimited(filter, "POST", "/api/auth/register");
         assertRateLimited(filter, "GET", "/api/public/guest/token-one");
         assertRateLimited(filter, "POST", "/api/public/guest/token-two/email-verification");
@@ -68,6 +69,7 @@ class PublicRateLimitFilterTest {
         properties.setMaxBuckets(100);
         Limit oneRequest = new Limit(1, 60);
         properties.setLogin(oneRequest);
+        properties.setAdminLogin(new Limit(1, 60));
         properties.setRegistration(new Limit(1, 60));
         properties.setGuestLink(new Limit(1, 60));
         properties.setOtpRequest(new Limit(1, 60));

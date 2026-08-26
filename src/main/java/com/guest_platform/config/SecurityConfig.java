@@ -17,15 +17,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import com.guest_platform.security.BearerSessionAuthenticationFilter;
 import com.guest_platform.security.ApiErrorWriter;
 import com.guest_platform.security.CookieCsrfProtectionFilter;
 import com.guest_platform.security.PublicRateLimitFilter;
 import com.guest_platform.service.HostSessionService;
+import com.guest_platform.service.AdminSessionService;
+import com.guest_platform.security.AdminSessionAuthenticationFilter;
+import com.guest_platform.security.AdminOriginProtectionFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -45,6 +50,57 @@ public class SecurityConfig {
     }
 
     @Bean
+    AdminSessionAuthenticationFilter adminSessionAuthenticationFilter(AdminSessionService adminSessionService,
+            ApiErrorWriter apiErrorWriter) {
+        return new AdminSessionAuthenticationFilter(adminSessionService, apiErrorWriter);
+    }
+
+    @Bean
+    AdminOriginProtectionFilter adminOriginProtectionFilter(AdminSessionService adminSessionService,
+            @org.springframework.beans.factory.annotation.Value("${app.admin.public-base-url:http://localhost:8080}")
+            String adminPublicBaseUrl, ApiErrorWriter apiErrorWriter) {
+        return new AdminOriginProtectionFilter(adminSessionService, adminPublicBaseUrl, apiErrorWriter);
+    }
+
+    @Bean
+    @Order(1)
+    SecurityFilterChain adminSecurityFilterChain(HttpSecurity http,
+            AdminSessionAuthenticationFilter adminSessionAuthenticationFilter,
+            AdminOriginProtectionFilter adminOriginProtectionFilter,
+            PublicRateLimitFilter publicRateLimitFilter,
+            ApiErrorWriter apiErrorWriter,
+            @Qualifier("adminCorsConfigurationSource") CorsConfigurationSource corsConfigurationSource) throws Exception {
+        http.securityMatcher("/api/admin/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/api/admin/auth/login", "/api/admin/auth/logout").permitAll()
+                        .anyRequest().authenticated())
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint((request, response, exception) -> apiErrorWriter.write(response,
+                                HttpServletResponse.SC_UNAUTHORIZED, "ADMIN_AUTH_REQUIRED",
+                                "Admin authentication is required.", false))
+                        .accessDeniedHandler((request, response, exception) -> apiErrorWriter.write(response,
+                                HttpServletResponse.SC_FORBIDDEN, "ADMIN_FORBIDDEN",
+                                "You do not have permission to perform this admin action.", false)))
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicyHeader(permissions -> permissions.policy(PERMISSIONS_POLICY))
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .frameOptions(frame -> frame.deny())
+                        .httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31_536_000).includeSubDomains(true)))
+                .addFilterBefore(publicRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(adminOriginProtectionFilter, CorsFilter.class)
+                .addFilterBefore(adminSessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource));
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             BearerSessionAuthenticationFilter bearerSessionAuthenticationFilter,
             PublicRateLimitFilter publicRateLimitFilter,
@@ -87,6 +143,21 @@ public class SecurityConfig {
             @org.springframework.beans.factory.annotation.Value("${app.security.cors.allowed-origins}") String allowedOrigins) {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", corsConfiguration(allowedOrigins));
+        return source;
+    }
+
+    @Bean("adminCorsConfigurationSource")
+    CorsConfigurationSource adminCorsConfigurationSource(
+            @org.springframework.beans.factory.annotation.Value("${app.admin.public-base-url:http://localhost:8080}")
+            String adminOrigin) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(java.util.List.of(adminOrigin));
+        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "OPTIONS"));
+        configuration.setAllowedHeaders(java.util.List.of("Content-Type"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/admin/**", configuration);
         return source;
     }
 

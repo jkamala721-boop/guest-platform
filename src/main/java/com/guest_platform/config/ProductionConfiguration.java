@@ -33,6 +33,7 @@ public class ProductionConfiguration {
         }
 
         validatePublicBaseUrl(required(environment, "app.public-base-url"));
+        validateAdminPublicBaseUrl(required(environment, "app.admin.public-base-url"));
         if (!"https://app.hostvero.net".equals(required(environment, "app.security.cors.allowed-origins"))) {
             throw new IllegalStateException("Production CORS origin must be https://app.hostvero.net");
         }
@@ -84,6 +85,17 @@ public class ProductionConfiguration {
             }
         } catch (URISyntaxException exception) {
             throw new IllegalStateException("Production public base URL must be a valid HTTPS URL", exception);
+        }
+    }
+
+    private static void validateAdminPublicBaseUrl(String value) {
+        try {
+            URI uri = new URI(value);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || !"admin.hostvero.net".equalsIgnoreCase(uri.getHost())) {
+                throw new IllegalStateException("Production admin public base URL must be https://admin.hostvero.net");
+            }
+        } catch (URISyntaxException exception) {
+            throw new IllegalStateException("Production admin public base URL must be a valid HTTPS URL", exception);
         }
     }
 

@@ -9,6 +9,7 @@ public class PublicRateLimitProperties {
     private boolean enabled = true;
     private int maxBuckets = 10_000;
     private Limit login = new Limit(10, 900);
+    private Limit adminLogin = new Limit(5, 900);
     private Limit registration = new Limit(5, 3600);
     private Limit guestLink = new Limit(120, 300);
     private Limit otpRequest = new Limit(5, 900);
@@ -24,6 +25,8 @@ public class PublicRateLimitProperties {
     public void setMaxBuckets(int maxBuckets) { this.maxBuckets = maxBuckets; }
     public Limit getLogin() { return login; }
     public void setLogin(Limit login) { this.login = login; }
+    public Limit getAdminLogin() { return adminLogin; }
+    public void setAdminLogin(Limit adminLogin) { this.adminLogin = adminLogin; }
     public Limit getRegistration() { return registration; }
     public void setRegistration(Limit registration) { this.registration = registration; }
     public Limit getGuestLink() { return guestLink; }
