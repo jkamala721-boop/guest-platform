@@ -27,6 +27,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.guest_platform.entity.HostPayoutStatus;
+import com.guest_platform.entity.HostNotificationType;
+import com.guest_platform.repository.HostNotificationRepository;
 import com.guest_platform.repository.HostPayoutRepository;
 import com.guest_platform.service.HostPayoutExecutionService;
 
@@ -45,6 +47,7 @@ class PaystackIntegrationTest {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private HostPayoutRepository hostPayoutRepository;
     @Autowired private HostPayoutExecutionService hostPayoutExecutionService;
+    @Autowired private HostNotificationRepository hostNotificationRepository;
     private int bookingOffset;
 
     @Test
@@ -67,6 +70,10 @@ class PaystackIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PROCESSING"))
                 .andReturn();
         String paymentId = json(result).get("id").asText();
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk());
+        assertThat(hostNotificationRepository.countByBookingIdAndType(java.util.UUID.fromString(bookingId),
+                HostNotificationType.PAYMENT_CONFIRMED)).isZero();
         mockMvc.perform(get("/api/payments/{paymentId}", paymentId).header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.serviceFee").value(175.00));
     }
@@ -88,6 +95,8 @@ class PaystackIntegrationTest {
         mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(payload))
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isNoContent());
+        assertThat(hostNotificationRepository.countByBookingIdAndType(java.util.UUID.fromString(bookingId),
+                HostNotificationType.PAYMENT_CONFIRMED)).isEqualTo(1);
         mockMvc.perform(get("/api/payments/{paymentId}", payment.get("id").asText())
                         .header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUCCEEDED"));
@@ -103,6 +112,8 @@ class PaystackIntegrationTest {
         mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(payload))
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isNoContent());
+        assertThat(hostNotificationRepository.countByBookingIdAndType(java.util.UUID.fromString(bookingId),
+                HostNotificationType.PAYMENT_CONFIRMED)).isEqualTo(1);
         mockMvc.perform(get("/api/receipts").header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
         mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId).header("Authorization", bearer(hostToken))
@@ -282,6 +293,13 @@ class PaystackIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(transferFailure))
                 .andExpect(status().isNoContent());
         assertThat(hostPayoutRepository.findById(payout.getId()).orElseThrow().getStatus()).isEqualTo(HostPayoutStatus.FAILED);
+        assertThat(hostNotificationRepository.countByPayoutIdAndType(payout.getId(), HostNotificationType.PAYOUT_ISSUE))
+                .isEqualTo(1);
+        mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(transferFailure))
+                        .contentType(MediaType.APPLICATION_JSON).content(transferFailure))
+                .andExpect(status().isNoContent());
+        assertThat(hostNotificationRepository.countByPayoutIdAndType(payout.getId(), HostNotificationType.PAYOUT_ISSUE))
+                .isEqualTo(1);
         mockMvc.perform(get("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
         mockMvc.perform(get("/api/public/guest/{token}", guestToken))

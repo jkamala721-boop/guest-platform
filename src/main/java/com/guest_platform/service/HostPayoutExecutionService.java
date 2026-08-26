@@ -37,6 +37,7 @@ public class HostPayoutExecutionService {
     private final Duration settlementHold;
     private final int batchSize;
     private final int maximumAttempts;
+    private final HostNotificationService hostNotificationService;
 
     public HostPayoutExecutionService(HostPayoutRepository payoutRepository,
             HostPayoutSettingsRepository settingsRepository, PaystackApiClient paystackApiClient,
@@ -44,7 +45,8 @@ public class HostPayoutExecutionService {
             @Value("${app.payments.paystack.mode:mock}") String mode,
             @Value("${app.payouts.settlement-hold-minutes:1440}") long settlementHoldMinutes,
             @Value("${app.payouts.scheduler.batch-size:20}") int batchSize,
-            @Value("${app.payouts.maximum-attempts:3}") int maximumAttempts) {
+            @Value("${app.payouts.maximum-attempts:3}") int maximumAttempts,
+            HostNotificationService hostNotificationService) {
         this.payoutRepository = payoutRepository;
         this.settingsRepository = settingsRepository;
         this.paystackApiClient = paystackApiClient;
@@ -53,6 +55,7 @@ public class HostPayoutExecutionService {
         this.settlementHold = Duration.ofMinutes(Math.max(0, settlementHoldMinutes));
         this.batchSize = Math.max(1, Math.min(batchSize, 50));
         this.maximumAttempts = Math.max(1, maximumAttempts);
+        this.hostNotificationService = hostNotificationService;
     }
 
     public void reconcilePayouts() {
@@ -148,9 +151,13 @@ public class HostPayoutExecutionService {
             if ("transfer.success".equals(event)) {
                 payout.markPaid(reference, transferCode);
             } else if ("transfer.failed".equals(event)) {
-                payout.markFailed("failed", "Paystack transfer failed", false);
+                if (payout.markFailed("failed", "Paystack transfer failed", false)) {
+                    hostNotificationService.payoutIssue(payout);
+                }
             } else if ("transfer.reversed".equals(event)) {
-                payout.markFailed("reversed", "Paystack transfer was reversed", false);
+                if (payout.markFailed("reversed", "Paystack transfer was reversed", false)) {
+                    hostNotificationService.payoutIssue(payout);
+                }
             }
         }));
     }
@@ -192,7 +199,9 @@ public class HostPayoutExecutionService {
             if ("success".equalsIgnoreCase(status)) {
                 payout.markPaid(reference, transferCode);
             } else if ("failed".equalsIgnoreCase(status) || "reversed".equalsIgnoreCase(status)) {
-                payout.markFailed(status, "Paystack transfer " + status, false);
+                if (payout.markFailed(status, "Paystack transfer " + status, false)) {
+                    hostNotificationService.payoutIssue(payout);
+                }
             } else {
                 payout.updateFromVerification(reference, transferCode, status);
             }
@@ -201,7 +210,11 @@ public class HostPayoutExecutionService {
 
     private void failSubmission(UUID payoutId, String providerMessage, boolean retryable) {
         transactions.executeWithoutResult(ignored -> payoutRepository.findForUpdateById(payoutId).ifPresent(
-                payout -> payout.markFailed("rejected", "Paystack transfer was rejected", retryable)));
+                payout -> {
+                    if (payout.markFailed("rejected", "Paystack transfer was rejected", retryable) && !retryable) {
+                        hostNotificationService.payoutIssue(payout);
+                    }
+                }));
         log.warn("Paystack host payout rejected: payoutId={}, retryable={}, message={}", payoutId, retryable,
                 providerMessage == null ? "Paystack rejected the request" : providerMessage);
     }

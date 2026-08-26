@@ -49,6 +49,7 @@ public class ProductionConfiguration {
         }
         required(environment, "app.notifications.resend.api-key");
         required(environment, "app.notifications.resend.from");
+        required(environment, "app.notifications.resend.host-template-id");
 
         if ("live".equalsIgnoreCase(value(environment, "app.payments.stripe.mode"))) {
             required(environment, "app.payments.stripe.secret-key");

@@ -44,6 +44,7 @@ public class PaymentService {
     private final BookingExtensionService bookingExtensionService;
     private final HostPayoutSettingsService hostPayoutSettingsService;
     private final HostPayoutService hostPayoutService;
+    private final HostNotificationService hostNotificationService;
     private final Map<PaymentProvider, PaymentProviderAdapter> providers;
     private final String publicBaseUrl;
 
@@ -51,6 +52,7 @@ public class PaymentService {
             ReceiptService receiptService, GuestLinkService guestLinkService, NotificationService notificationService,
             BookingExtensionRepository bookingExtensionRepository, BookingExtensionService bookingExtensionService,
             HostPayoutSettingsService hostPayoutSettingsService, HostPayoutService hostPayoutService,
+            HostNotificationService hostNotificationService,
             List<PaymentProviderAdapter> providerAdapters,
             @Value("${app.public-base-url:http://localhost:8080}") String publicBaseUrl) {
         this.bookingRepository = bookingRepository;
@@ -62,6 +64,7 @@ public class PaymentService {
         this.bookingExtensionService = bookingExtensionService;
         this.hostPayoutSettingsService = hostPayoutSettingsService;
         this.hostPayoutService = hostPayoutService;
+        this.hostNotificationService = hostNotificationService;
         this.providers = providerAdapters.stream().collect(Collectors.toMap(PaymentProviderAdapter::provider,
                 Function.identity(), (first, ignored) -> first, () -> new EnumMap<>(PaymentProvider.class)));
         this.publicBaseUrl = trimTrailingSlash(publicBaseUrl);
@@ -268,6 +271,9 @@ public class PaymentService {
         guestLinkService.activateForConfirmedBooking(booking);
         notificationService.reconcileBooking(booking.getId());
         hostPayoutService.queueForVerifiedPayment(payment);
+        if (payment.getBookingExtension() == null) {
+            hostNotificationService.paymentConfirmed(booking, payment.getId());
+        }
     }
 
     private boolean hasInProgressPayment(Booking booking, BookingExtension extension) {

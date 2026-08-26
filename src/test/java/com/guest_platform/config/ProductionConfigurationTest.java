@@ -49,6 +49,7 @@ class ProductionConfigurationTest {
                 .withProperty("app.notifications.resend.enabled", "true")
                 .withProperty("app.notifications.resend.api-key", "test-only-key")
                 .withProperty("app.notifications.resend.from", "noreply@example.test")
+                .withProperty("app.notifications.resend.host-template-id", "d23c7838-b503-4792-b7f9-60e54969828c")
                 .withProperty("app.security.cors.allowed-origins", "https://app.hostvero.net")
                 .withProperty("app.security.payout-fingerprint-secret", "test-only-fingerprint-key")
                 .withProperty("app.security.guest-identity-fingerprint-secret", "test-only-identity-key")

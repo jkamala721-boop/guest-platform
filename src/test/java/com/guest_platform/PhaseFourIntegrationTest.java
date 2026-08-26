@@ -1,5 +1,6 @@
 package com.guest_platform;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,6 +27,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import com.guest_platform.entity.HostNotificationType;
+import com.guest_platform.repository.HostNotificationRepository;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -44,6 +47,9 @@ class PhaseFourIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private HostNotificationRepository hostNotificationRepository;
 
     @Test
     void hostCanInitiateOwnPaymentUsingBookingAmountAndCurrencyOnly() throws Exception {
@@ -260,6 +266,12 @@ class PhaseFourIntegrationTest {
 
         mockMvc.perform(delete("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(token)))
                 .andExpect(status().isNoContent());
+        assertThat(hostNotificationRepository.countByBookingIdAndType(java.util.UUID.fromString(bookingId),
+                HostNotificationType.BOOKING_CANCELLED)).isEqualTo(1);
+        mockMvc.perform(delete("/api/bookings/{bookingId}", bookingId).header("Authorization", bearer(token)))
+                .andExpect(status().isNoContent());
+        assertThat(hostNotificationRepository.countByBookingIdAndType(java.util.UUID.fromString(bookingId),
+                HostNotificationType.BOOKING_CANCELLED)).isEqualTo(1);
         mockMvc.perform(post("/api/bookings/{bookingId}/guest-link", bookingId).header("Authorization", bearer(token)))
                 .andExpect(status().isConflict());
         mockMvc.perform(get("/api/public/guest/{token}", guestToken)).andExpect(status().isNotFound());

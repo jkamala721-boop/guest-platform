@@ -36,11 +36,13 @@ public class BookingService {
     private final NotificationService notificationService;
     private final PaymentRepository paymentRepository;
     private final GuestLinkService guestLinkService;
+    private final HostNotificationService hostNotificationService;
 
     public BookingService(HostRepository hostRepository, PropertyRepository propertyRepository,
             GuestRepository guestRepository, BookingRepository bookingRepository,
             AvailabilityService availabilityService, NotificationService notificationService,
-            PaymentRepository paymentRepository, GuestLinkService guestLinkService) {
+            PaymentRepository paymentRepository, GuestLinkService guestLinkService,
+            HostNotificationService hostNotificationService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
         this.guestRepository = guestRepository;
@@ -49,6 +51,7 @@ public class BookingService {
         this.notificationService = notificationService;
         this.paymentRepository = paymentRepository;
         this.guestLinkService = guestLinkService;
+        this.hostNotificationService = hostNotificationService;
     }
 
     @Transactional
@@ -149,6 +152,7 @@ public class BookingService {
         booking.cancel();
         guestLinkService.revokeUsableLinksForCancelledBooking(booking);
         notificationService.cancelPendingForBooking(booking.getId());
+        hostNotificationService.bookingCancelled(booking);
     }
 
     private Host findActiveHost(UUID hostId) {
