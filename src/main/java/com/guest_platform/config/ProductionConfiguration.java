@@ -39,6 +39,7 @@ public class ProductionConfiguration {
         }
         required(environment, "app.security.payout-fingerprint-secret");
         required(environment, "app.security.guest-identity-fingerprint-secret");
+        required(environment, "app.security.host-identity-fingerprint-secret");
         required(environment, "app.security.property-access-encryption-key");
 
         String defaultChannel = required(environment, "app.notifications.default-channel");

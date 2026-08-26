@@ -16,6 +16,7 @@ import com.guest_platform.entity.Property;
 public interface PropertyRepository extends JpaRepository<Property, UUID> {
     List<Property> findAllByHostIdOrderByCreatedAtDesc(UUID hostId);
     Optional<Property> findByIdAndHostId(UUID id, UUID hostId);
+    boolean existsByHostIdAndActiveTrue(UUID hostId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select property from Property property where property.id = :id")
     Optional<Property> findForUpdateById(@Param("id") UUID id);

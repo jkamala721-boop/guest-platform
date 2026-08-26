@@ -19,6 +19,9 @@ import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.exception.WebhookAuthenticationException;
 import com.guest_platform.exception.AdminInvalidCredentialsException;
 import com.guest_platform.exception.AdminAccountDisabledException;
+import com.guest_platform.exception.LifecycleConflictException;
+import com.guest_platform.exception.LifecycleNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import com.guest_platform.service.payment.PaystackApiClient.PaystackRequestRejectedException;
 
 @RestControllerAdvice
@@ -50,6 +53,22 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiErrorResponse> adminDisabled(AdminAccountDisabledException exception) {
         return response(HttpStatus.FORBIDDEN, "ADMIN_ACCOUNT_DISABLED",
                 "This admin account is disabled.", null, false, null);
+    }
+
+    @ExceptionHandler(LifecycleConflictException.class)
+    ResponseEntity<ApiErrorResponse> lifecycleConflict(LifecycleConflictException exception) {
+        return response(HttpStatus.CONFLICT, exception.getCode(), exception.getMessage(), null, false, null);
+    }
+
+    @ExceptionHandler(LifecycleNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> lifecycleNotFound(LifecycleNotFoundException exception) {
+        return response(HttpStatus.NOT_FOUND, exception.getCode(), exception.getMessage(), null, false, null);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ApiErrorResponse> adminForbidden(AccessDeniedException exception) {
+        return response(HttpStatus.FORBIDDEN, "ADMIN_FORBIDDEN",
+                "You do not have permission to perform this admin action.", null, false, null);
     }
 
     @ExceptionHandler(ConflictException.class)

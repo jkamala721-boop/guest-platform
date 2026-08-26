@@ -33,6 +33,10 @@ public class AdminAuditLog {
         this.entityType = entityType;
         this.entityId = entityId;
     }
+    public AdminAuditLog(AdminUser adminUser, String action, String entityType, String entityId, String reason) {
+        this(adminUser, action, entityType, entityId);
+        this.reason = reason;
+    }
     @PrePersist void onCreate() { if (id == null) id = UUID.randomUUID(); createdAt = Instant.now(); }
     public UUID getId() { return id; }
     public AdminUser getAdminUser() { return adminUser; }

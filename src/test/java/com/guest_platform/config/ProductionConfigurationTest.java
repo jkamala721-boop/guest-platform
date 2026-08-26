@@ -54,6 +54,7 @@ class ProductionConfigurationTest {
                 .withProperty("app.security.cors.allowed-origins", "https://app.hostvero.net")
                 .withProperty("app.security.payout-fingerprint-secret", "test-only-fingerprint-key")
                 .withProperty("app.security.guest-identity-fingerprint-secret", "test-only-identity-key")
+                .withProperty("app.security.host-identity-fingerprint-secret", "test-only-host-identity-key")
                 .withProperty("app.security.property-access-encryption-key", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
                 .withProperty("app.payments.stripe.mode", "mock")
                 .withProperty("app.payments.paystack.mode", "mock")
@@ -72,5 +73,13 @@ class ProductionConfigurationTest {
                 .withProperty("app.security.cors.allowed-origins", "*");
         assertThatIllegalStateException().isThrownBy(() -> ProductionConfiguration.validate(wildcardCors))
                 .withMessage("Production CORS origin must be https://app.hostvero.net");
+    }
+
+    @Test
+    void requiresDedicatedHostIdentityFingerprintSecret() {
+        MockEnvironment missing = validProductionEnvironment()
+                .withProperty("app.security.host-identity-fingerprint-secret", "");
+        assertThatIllegalStateException().isThrownBy(() -> ProductionConfiguration.validate(missing))
+                .withMessage("Production configuration is missing app.security.host-identity-fingerprint-secret");
     }
 }

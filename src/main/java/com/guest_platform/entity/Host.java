@@ -6,6 +6,8 @@ import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -31,6 +33,13 @@ public class Host {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20)
+    private HostAccountStatus accountStatus = HostAccountStatus.ACTIVE;
+
+    @Column(name = "account_suspension_reason", length = 1000)
+    private String accountSuspensionReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -69,6 +78,8 @@ public class Host {
     public String getFullName() { return fullName; }
     public String getPhone() { return phone; }
     public boolean isActive() { return active; }
+    public HostAccountStatus getAccountStatus() { return accountStatus; }
+    public String getAccountSuspensionReason() { return accountSuspensionReason; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 
@@ -76,4 +87,7 @@ public class Host {
         this.fullName = fullName;
         this.phone = phone;
     }
+
+    public void suspend(String reason) { accountStatus = HostAccountStatus.SUSPENDED; accountSuspensionReason = reason; }
+    public void reactivate() { accountStatus = HostAccountStatus.ACTIVE; accountSuspensionReason = null; }
 }

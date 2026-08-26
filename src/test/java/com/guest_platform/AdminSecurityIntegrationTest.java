@@ -140,7 +140,9 @@ class AdminSecurityIntegrationTest {
         mockMvc.perform(get("/api/admin/me").cookie(cookie)).andExpect(status().isUnauthorized());
         var auditRows = audits.findAllByOrderByCreatedAtAsc();
         assertThat(auditRows).anyMatch(log -> AdminAuditService.ADMIN_LOGOUT.equals(log.getAction()));
-        assertThat(auditRows).allSatisfy(log -> {
+        assertThat(auditRows).filteredOn(log -> java.util.Set.of(AdminAuditService.ADMIN_BOOTSTRAPPED,
+                AdminAuditService.ADMIN_LOGIN_SUCCESS, AdminAuditService.ADMIN_LOGOUT).contains(log.getAction()))
+                .allSatisfy(log -> {
             assertThat(log.getPreviousState()).isNull();
             assertThat(log.getNewState()).isNull();
             assertThat(log.getReason()).isNull();
