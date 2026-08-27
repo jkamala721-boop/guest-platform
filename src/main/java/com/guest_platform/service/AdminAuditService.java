@@ -18,10 +18,12 @@ public class AdminAuditService {
     public static final String HOST_REACTIVATED = "HOST_REACTIVATED";
     public static final String HOST_AGREEMENT_CREATED = "HOST_AGREEMENT_CREATED";
     public static final String HOST_AGREEMENT_ACTIVATED = "HOST_AGREEMENT_ACTIVATED";
+    public static final String HOST_PAYOUT_MANUAL_CONFIRMED = "HOST_PAYOUT_MANUAL_CONFIRMED";
+    public static final String HOST_PAYOUT_MARKED_FAILED = "HOST_PAYOUT_MARKED_FAILED";
     private static final java.util.Set<String> ALLOWED = java.util.Set.of(ADMIN_LOGIN_SUCCESS, ADMIN_LOGOUT,
             ADMIN_BOOTSTRAPPED, HOST_VERIFICATION_REVIEW_STARTED, HOST_VERIFICATION_APPROVED,
             HOST_VERIFICATION_REJECTED, HOST_SUSPENDED, HOST_REACTIVATED, HOST_AGREEMENT_CREATED,
-            HOST_AGREEMENT_ACTIVATED);
+            HOST_AGREEMENT_ACTIVATED, HOST_PAYOUT_MANUAL_CONFIRMED, HOST_PAYOUT_MARKED_FAILED);
     private final AdminAuditLogRepository repository;
 
     public AdminAuditService(AdminAuditLogRepository repository) { this.repository = repository; }

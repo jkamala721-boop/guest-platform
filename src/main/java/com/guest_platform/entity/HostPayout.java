@@ -181,6 +181,32 @@ public class HostPayout {
         return true;
     }
 
+    public boolean confirmManual(String externalReference) {
+        if (status == HostPayoutStatus.PAID) return externalReference != null && externalReference.equals(transferCode)
+                && "manual_confirmed".equals(providerStatus);
+        if ((status != HostPayoutStatus.AVAILABLE
+                && (status != HostPayoutStatus.FAILED || retryable)) || transferCode != null) return false;
+        transferCode = externalReference;
+        status = HostPayoutStatus.PAID;
+        providerStatus = "manual_confirmed";
+        failureReason = null;
+        retryable = false;
+        completedAt = Instant.now();
+        lastAttemptAt = completedAt;
+        return true;
+    }
+
+    public boolean markManuallyFailed(String reason) {
+        if (status == HostPayoutStatus.FAILED && !retryable && safeReason(reason).equals(failureReason)) return true;
+        if (status != HostPayoutStatus.AVAILABLE) return false;
+        status = HostPayoutStatus.FAILED;
+        providerStatus = "manual_failure";
+        failureReason = safeReason(reason);
+        retryable = false;
+        lastAttemptAt = Instant.now();
+        return true;
+    }
+
     public boolean restoreForVerifiedRetry() {
         if (status != HostPayoutStatus.FAILED || !retryable || transferCode != null) {
             return false;
@@ -235,4 +261,6 @@ public class HostPayout {
     public Instant getLastAttemptAt() { return lastAttemptAt; }
     public int getAttemptCount() { return attemptCount; }
     public boolean isRetryable() { return retryable; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }
