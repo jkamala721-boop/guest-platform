@@ -458,6 +458,11 @@
   display: none;
 }
 
+.mobile-menu-button,
+.mobile-menu-backdrop {
+  display: none;
+}
+
 
 /* =========================================================
    TABLET
@@ -504,7 +509,43 @@
   }
 
   .sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 70;
+    display: flex;
+    width: min(84vw, 300px);
+    height: 100dvh;
+    overflow-y: auto;
+    transform: translateX(-105%);
+    transition: transform var(--hv-transition);
+    box-shadow: var(--hv-shadow-lg);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .mobile-menu-backdrop:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: block;
+    background: rgba(15, 23, 42, .48);
+  }
+
+  .mobile-menu-button {
+    display: inline-grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid var(--hv-border);
+    border-radius: var(--hv-radius-sm);
+    background: #fff;
+    color: var(--hv-text);
+    font-size: 1.25rem;
   }
 
   .main-area {
@@ -557,6 +598,11 @@
 
   .page-heading {
     gap: .85rem;
+  }
+
+  .topbar-left,
+  .topbar-actions {
+    min-width: 0;
   }
 
   .mobile-nav {
@@ -622,6 +668,14 @@
    ========================================================= */
 
 @media (max-width: 480px) {
+
+  .topbar {
+    padding-inline: .75rem;
+  }
+
+  .page {
+    padding-inline: .75rem;
+  }
 
   .page-heading {
     flex-direction: column;

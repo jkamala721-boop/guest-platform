@@ -22,6 +22,7 @@ import com.guest_platform.exception.AdminAccountDisabledException;
 import com.guest_platform.exception.LifecycleConflictException;
 import com.guest_platform.exception.LifecycleNotFoundException;
 import com.guest_platform.exception.HostOnboardingIncompleteException;
+import com.guest_platform.exception.HostOperationalAccessException;
 import org.springframework.security.access.AccessDeniedException;
 import com.guest_platform.service.payment.PaystackApiClient.PaystackRequestRejectedException;
 
@@ -75,6 +76,18 @@ public class ApiExceptionHandler {
         details.put("propertyComplete",Boolean.toString(state.property().complete()));
         details.put("payoutComplete",Boolean.toString(state.payout().complete()));
         return response(HttpStatus.CONFLICT,"HOST_ONBOARDING_INCOMPLETE",exception.getMessage(),null,false,details);
+    }
+
+    @ExceptionHandler(HostOperationalAccessException.class)
+    ResponseEntity<ApiErrorResponse> operationalAccess(HostOperationalAccessException exception) {
+        var access = exception.getAccess();
+        Map<String,String> details = new java.util.LinkedHashMap<>();
+        details.put("verificationStatus", access.verificationStatus().name());
+        details.put("verificationSubmissionRequired", Boolean.toString(access.verificationSubmissionRequired()));
+        details.put("accountSuspended", Boolean.toString(access.accountSuspended()));
+        details.put("verificationGraceEndsAt", access.verificationGraceEndsAt().toString());
+        details.put("verificationDaysRemaining", Long.toString(access.verificationDaysRemaining()));
+        return response(exception.getStatus(), access.code(), access.message(), null, false, details);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

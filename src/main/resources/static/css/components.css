@@ -839,6 +839,22 @@ textarea {
 
 @media (max-width: 620px) {
 
+  .modal-backdrop {
+    align-items: end;
+    padding: .5rem;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: calc(100dvh - 1rem);
+    overscroll-behavior: contain;
+  }
+
+  .modal-header,
+  .modal-body {
+    padding: 1rem;
+  }
+
   .stats,
   .three-col,
   .form-grid {
@@ -871,6 +887,14 @@ textarea {
 
   .form-actions .button {
     width: 100%;
+    min-height: 44px;
+  }
+
+  input,
+  select,
+  textarea,
+  .button {
+    max-width: 100%;
   }
 
 }

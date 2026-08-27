@@ -47,7 +47,7 @@ public class PaymentService {
     private final HostNotificationService hostNotificationService;
     private final Map<PaymentProvider, PaymentProviderAdapter> providers;
     private final String publicBaseUrl;
-    private final HostOnboardingService onboardingService;
+    private final HostOperationalAccessService operationalAccess;
 
     public PaymentService(BookingRepository bookingRepository, PaymentRepository paymentRepository,
             ReceiptService receiptService, GuestLinkService guestLinkService, NotificationService notificationService,
@@ -56,7 +56,7 @@ public class PaymentService {
             HostNotificationService hostNotificationService,
             List<PaymentProviderAdapter> providerAdapters,
             @Value("${app.public-base-url:http://localhost:8080}") String publicBaseUrl,
-            HostOnboardingService onboardingService) {
+            HostOperationalAccessService operationalAccess) {
         this.bookingRepository = bookingRepository;
         this.paymentRepository = paymentRepository;
         this.receiptService = receiptService;
@@ -70,7 +70,7 @@ public class PaymentService {
         this.providers = providerAdapters.stream().collect(Collectors.toMap(PaymentProviderAdapter::provider,
                 Function.identity(), (first, ignored) -> first, () -> new EnumMap<>(PaymentProvider.class)));
         this.publicBaseUrl = trimTrailingSlash(publicBaseUrl);
-        this.onboardingService = onboardingService;
+        this.operationalAccess = operationalAccess;
     }
 
     @Transactional
@@ -90,7 +90,7 @@ public class PaymentService {
 
     @Transactional
     public PaymentInitiationResponse initiate(UUID hostId, UUID bookingId, PaymentInitiateRequest request) {
-        onboardingService.requireReady(hostId);
+        operationalAccess.requireAccess(hostId);
         Booking booking = bookingRepository.findForUpdateByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
         if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {

@@ -65,8 +65,14 @@ class WebInterfaceControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/api/me/agreement/accept")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Add your first property")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Set up payouts")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("Your Hostvero account is ready.")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("HOST_ONBOARDING_INCOMPLETE")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Your Hostvero account setup is complete.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Verification required within")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Verification submitted")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("review your information")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Verification needs an update.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("HOST_VERIFICATION_REQUIRED")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("mobile-menu-button")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Log out")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("idFingerprint"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("recipientCode"))));
     }

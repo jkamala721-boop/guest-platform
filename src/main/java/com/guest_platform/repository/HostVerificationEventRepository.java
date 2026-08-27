@@ -3,4 +3,5 @@ import java.util.UUID; import org.springframework.data.domain.*; import org.spri
 public interface HostVerificationEventRepository extends JpaRepository<HostVerificationEvent,UUID>{
  @EntityGraph(attributePaths="verification") @Query("select e from HostVerificationEvent e where e.verification.host.id=:hostId")
  Page<HostVerificationEvent> findTimeline(@Param("hostId") UUID hostId,Pageable pageable);
+ long countByVerificationIdAndEventType(UUID verificationId,String eventType);
 }

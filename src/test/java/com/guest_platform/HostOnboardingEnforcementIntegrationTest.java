@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,25 +44,33 @@ class HostOnboardingEnforcementIntegrationTest {
  @Autowired HostVerificationService verification;
  @Autowired HostAgreementService agreements;
  @Autowired PropertyService propertyService;
+ @Autowired JdbcTemplate jdbc;
 
- @Test void incompleteHostCannotUseLaunchOperationsAndErrorIsSafe() throws Exception {
+ @Test void newUnverifiedHostWithinGraceCanCreateBookingAndGuestLink() throws Exception {
   Host host=host(); Property property=property(host); Cookie cookie=cookie(host);
+  String created=mvc.perform(post("/api/bookings").cookie(cookie).header("Origin","http://localhost:8080")
+    .contentType(MediaType.APPLICATION_JSON).content(bookingJson(property.getId())))
+   .andExpect(status().isCreated())
+   .andReturn().getResponse().getContentAsString();
+  UUID bookingId=UUID.fromString(json.readTree(created).get("id").asText());
+  mvc.perform(post("/api/bookings/{id}/guest-link",bookingId).cookie(cookie)
+    .header("Origin","http://localhost:8080"))
+   .andExpect(status().isCreated());
+ }
+
+ @Test void expiredUnverifiedHostIsBlockedButSubmissionImmediatelyRestoresAccess() throws Exception {
+  Host host=host();Property property=property(host);Cookie cookie=cookie(host);
+  jdbc.update("update hosts set created_at=? where id=?",java.sql.Timestamp.from(Instant.now().minusSeconds(16L*86400)),host.getId());
   String response=mvc.perform(post("/api/bookings").cookie(cookie).header("Origin","http://localhost:8080")
     .contentType(MediaType.APPLICATION_JSON).content(bookingJson(property.getId())))
-   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("HOST_ONBOARDING_INCOMPLETE"))
-   .andExpect(jsonPath("$.validationErrors.verificationComplete").value("false"))
-   .andExpect(jsonPath("$.validationErrors.propertyComplete").value("true"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("HOST_VERIFICATION_REQUIRED"))
+   .andExpect(jsonPath("$.validationErrors.verificationSubmissionRequired").value("true"))
    .andReturn().getResponse().getContentAsString();
   assertThat(response).doesNotContain("fingerprint","recipient","idNumber","password","secret");
-
-  Booking booking=booking(host,property);
-  mvc.perform(post("/api/bookings/{id}/guest-link",booking.getId()).cookie(cookie)
-    .header("Origin","http://localhost:8080"))
-   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("HOST_ONBOARDING_INCOMPLETE"));
-  mvc.perform(post("/api/bookings/{id}/payments",booking.getId()).cookie(cookie)
-    .header("Origin","http://localhost:8080").contentType(MediaType.APPLICATION_JSON)
-    .content("{\"provider\":\"PAYSTACK\"}"))
-   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("HOST_ONBOARDING_INCOMPLETE"));
+  assertThat(verification.submit(host.getId(),verificationRequest()).status()).isEqualTo(HostVerificationStatus.SUBMITTED);
+  mvc.perform(post("/api/bookings").cookie(cookie).header("Origin","http://localhost:8080")
+    .contentType(MediaType.APPLICATION_JSON).content(bookingJson(property.getId())))
+   .andExpect(status().isCreated());
  }
 
  @Test void completionActionsRemainAllowedAndReadyHostCanCreateBookingAndGuestLink() throws Exception {

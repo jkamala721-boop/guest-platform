@@ -62,7 +62,7 @@ const navItems = [
   ['payments', 'Payments'],
   ['notifications', 'Notifications']
 ];
-const state = { host: null, onboarding: null, bookings: [], properties: [], guests: [] };
+const state = { host: null, onboarding: null, operationalAccess: null, bookings: [], properties: [], guests: [] };
 
 const hashRoute = () => location.hash.replace(/^#\/?/, '') || 'overview';
 const go = (route) => { location.hash = `#/${route}`; };
@@ -72,7 +72,9 @@ const dateInput = (date = '') => String(date || '').slice(0, 10);
 const pageTitle = route => ({ onboarding: 'Setup', overview: 'Overview', bookings: 'Bookings', guests: 'Guests', properties: 'Properties', payments: 'Payments', notifications: 'Notifications', settings: 'Settings' })[route] || 'Hostvero';
 
 async function loadOnboarding() { state.onboarding = await get('/api/me/onboarding'); return state.onboarding; }
-async function routeForOnboarding() { const onboarding = await loadOnboarding(); go(onboarding.ready ? 'overview' : 'onboarding'); }
+async function loadOperationalAccess() { state.operationalAccess = await get('/api/me/operational-access'); return state.operationalAccess; }
+async function loadHostAccessState() { await Promise.all([loadOnboarding(),loadOperationalAccess()]); return state.operationalAccess; }
+async function routeForOnboarding() { const access = await loadHostAccessState(); go(access.accessAllowed ? 'overview' : 'onboarding'); }
 
 function onboardingStep(title, complete, stateLabel, body) {
   return `<article class="card card-pad onboarding-step ${complete ? 'complete' : ''}"><header class="onboarding-step-header"><div><span class="onboarding-step-mark">${complete ? '✓' : '•'}</span><h2>${escapeHtml(title)}</h2></div><span class="badge ${complete ? 'active' : 'pending-payment'}">${escapeHtml(complete ? 'Complete' : stateLabel)}</span></header>${body || ''}</article>`;
@@ -81,11 +83,12 @@ function onboardingStep(title, complete, stateLabel, body) {
 async function renderOnboarding() {
   app.innerHTML = hostShell('onboarding', `${heading('Set up your Hostvero account','Complete these four requirements before creating bookings and guest links.')}<section class="onboarding-list">${loadingCards()}</section>`); bindShell();
   try {
-    const [onboarding, verification, agreement] = await Promise.all([loadOnboarding(), get('/api/me/verification'), get('/api/me/agreement').catch(error=>{if(error?.status===404)return null;throw error;})]);
+    const [onboarding, access, verification, agreement] = await Promise.all([loadOnboarding(),loadOperationalAccess(),get('/api/me/verification'), get('/api/me/agreement').catch(error=>{if(error?.status===404)return null;throw error;})]);
     const verificationForm = ['UNVERIFIED','REJECTED'].includes(verification.status) ? `<form id="verification-form" class="onboarding-form"><div class="form-grid"><div class="field"><label>Legal name</label><input name="legalName" required maxlength="160"></div><div class="field"><label>Verification type</label><select name="verificationType" required><option value="INDIVIDUAL">Individual</option><option value="SOLE_PROPRIETOR">Sole proprietor</option><option value="REGISTERED_BUSINESS">Registered business</option></select></div><div class="field"><label>Document country</label><select name="countryCode" id="verification-country" required><option value="KE">Kenya (KE)</option><option value="CD">DR Congo (CD)</option></select></div><div class="field"><label>Document type</label><select name="idType" id="verification-id-type" required><option value="NATIONAL_ID">National ID</option><option value="PASSPORT">Passport</option></select></div><div class="field"><label>ID or passport number</label><input name="idNumber" required maxlength="40" autocomplete="off"><span class="help">Used securely for verification; only a protected fingerprint and last four characters are retained.</span></div><div class="field"><label>Phone number</label><input name="phone" required maxlength="32" placeholder="+254… or +243…"><span class="help">Use a supported international number. Phone country may differ from document country.</span></div></div><div class="form-actions"><button class="button" type="submit">${verification.status==='REJECTED'?'Resubmit verification':'Submit for review'}</button></div></form>` : '';
-    const verificationBody = verification.status==='SUBMITTED'?'<div class="notice">Submitted for review. Hostvero will update this step after review.</div>':verification.status==='UNDER_REVIEW'?'<div class="notice">Review in progress. No further submission is needed.</div>':verification.status==='REJECTED'?`<div class="notice warning"><strong>Verification needs attention.</strong><p>${escapeHtml(verification.rejectionReason||'Please review your details and submit again.')}</p></div>${verificationForm}`:verification.status==='VERIFIED'?'<p class="muted">Your identity has been verified.</p>':verificationForm;
+    const graceCopy=access.verificationSubmissionRequired?'<div class="notice warning"><strong>Verification is now required.</strong><p>Operational features are temporarily restricted until you submit this form.</p></div>':`<div class="notice warning"><strong>Verification required within ${access.verificationDaysRemaining} day${access.verificationDaysRemaining===1?'':'s'}.</strong><p>You can continue using Hostvero while you complete this step.</p></div>`;
+    const verificationBody = access.accountSuspended?`<div class="notice warning"><strong>Account under review.</strong><p>${escapeHtml(verification.suspensionReason||access.message||'Contact Hostvero support for assistance.')}</p></div>`:verification.status==='SUBMITTED'?'<div class="notice">Verification submitted. You can continue using Hostvero while we review your information.</div>':verification.status==='UNDER_REVIEW'?'<div class="notice">Verification under review. You can continue using Hostvero normally.</div>':verification.status==='REJECTED'?`<div class="notice warning"><strong>Verification needs an update.</strong><p>${escapeHtml(verification.rejectionReason||'Please review your details and submit again.')}</p><p>You can continue using Hostvero while correcting this information.</p></div>${verificationForm}`:verification.status==='VERIFIED'?'<p class="muted">Your identity has been verified.</p>':`${graceCopy}${verificationForm}`;
     const agreementBody = !agreement?'<div class="notice">The Host Agreement is not available yet. You can continue the other setup steps and return here later.</div>':agreement.accepted?`<p class="muted">Accepted ${formatDateTime(agreement.acceptedAt)}.</p>`:`<div class="agreement-document"><h3>${escapeHtml(agreement.title||'Host Agreement')}</h3><p class="muted">Version ${escapeHtml(agreement.version)} · Effective ${formatDate(agreement.effectiveAt)}</p><div class="agreement-content">${escapeHtml(agreement.content)}</div></div><form id="agreement-form"><label class="agreement-ack"><input type="checkbox" name="acknowledged" required> I have read and agree to the current Host Agreement.</label><div class="form-actions"><button class="button" type="submit">Accept agreement</button></div></form>`;
-    const complete = onboarding.ready ? `<section class="card card-pad onboarding-complete"><h2>Your Hostvero account is ready.</h2><p>You can now create bookings and secure guest links.</p><a class="button" href="#/overview">Go to dashboard</a></section>` : '';
+    const complete = onboarding.ready ? `<section class="card card-pad onboarding-complete"><h2>Your Hostvero account setup is complete.</h2><p>All recommended setup requirements are complete.</p><a class="button" href="#/overview">Go to dashboard</a></section>` : '';
     app.innerHTML = hostShell('onboarding', `${heading('Set up your Hostvero account','Complete these four requirements before creating bookings and guest links.')}${complete}<section class="onboarding-list">${onboardingStep('1. Verify identity',onboarding.verification.complete,verification.status==='REJECTED'?'Action required':verification.status==='SUBMITTED'||verification.status==='UNDER_REVIEW'?'Waiting for review':'Action required',verificationBody)}${onboardingStep('2. Accept Host Agreement',onboarding.agreement.complete,'Action required',agreementBody)}${onboardingStep('3. Add first property',onboarding.property.complete,'Action required',onboarding.property.complete?'<p class="muted">An active property is available.</p>':'<p>Add the first active property used for bookings and guest stays.</p><a class="button" href="#/properties/new">Add your first property</a>')}${onboardingStep('4. Configure payout',onboarding.payout.complete,'Action required',onboarding.payout.complete?'<p class="muted">Your payout destination is configured.</p>':'<p>Choose the verified destination where Hostvero should send payouts.</p><a class="button" href="#/settings">Set up payouts</a>')}</section>`); bindShell(); bindOnboarding();
   } catch (error) { showHostError('onboarding',error); }
 }
@@ -98,8 +101,8 @@ function bindOnboarding() {
 
 function hostShell(route, content) {
   const active = route.split('/')[0];
-  const incomplete = state.onboarding && !state.onboarding.ready;
-  const visibleNav = incomplete ? [['onboarding','Setup'],['properties','Properties']] : navItems;
+  const restricted = state.operationalAccess && !state.operationalAccess.accessAllowed;
+  const visibleNav = restricted ? [['onboarding','Setup']] : navItems;
 
   const nav = visibleNav.map(([key, label]) => `
     <a
@@ -129,7 +132,9 @@ function hostShell(route, content) {
   return `
     <div class="app-shell">
 
-      <aside class="sidebar">
+      <div class="mobile-menu-backdrop" id="mobile-menu-backdrop" hidden></div>
+
+      <aside class="sidebar" id="host-sidebar">
 
         <div class="sidebar-brand">
           <a href="#/overview" aria-label="Hostvero overview">
@@ -180,7 +185,9 @@ function hostShell(route, content) {
 
           <div class="topbar-actions">
 
-            ${incomplete ? '' : `<a
+            <button class="mobile-menu-button" id="mobile-menu-button" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="host-sidebar">☰</button>
+
+            ${restricted ? '' : `<a
               class="button small topbar-create"
               href="#/bookings/new"
             >
@@ -241,6 +248,12 @@ async function hydrateBasics() {
   state.properties = properties; state.guests = guests; state.bookings = bookings; return state;
 }
 
+function verificationReminder() {
+  const access=state.operationalAccess;if(!access||access.verificationStatus==='VERIFIED')return '';
+  const message=access.accountSuspended?'Your account is suspended pending review.':access.verificationStatus==='SUBMITTED'?'Verification submitted — review pending.':access.verificationStatus==='UNDER_REVIEW'?'Verification is under review.':access.verificationStatus==='REJECTED'?'Verification needs an update.':access.verificationSubmissionRequired?'Submit verification to restore operational access.':`Verify your identity within ${access.verificationDaysRemaining} day${access.verificationDaysRemaining===1?'':'s'}.`;
+  return `<div class="notice verification-reminder"><span>${escapeHtml(message)}</span><a class="button small secondary" href="#/onboarding">Review setup</a></div>`;
+}
+
 async function renderOverview() {
   app.innerHTML = hostShell(
     'overview',
@@ -249,6 +262,7 @@ async function renderOverview() {
         'Overview',
         'See what needs your attention across bookings, guests and properties.'
       )}
+      ${verificationReminder()}
 
       <section class="grid stats">
         ${Array.from({ length: 4 }, () => `
@@ -5024,9 +5038,9 @@ function renderAuth(mode = 'login') {
       );
 
       state.host = response.host;
-      const onboarding=await loadOnboarding();
-      toast(registration?'Your account was created. Complete setup to start operating.':'Welcome back.','success');
-      go(onboarding.ready?'overview':'onboarding');
+      const access=await loadHostAccessState();
+      toast(registration?'Your account was created. Review your setup checklist and verification deadline.':'Welcome back.','success');
+      go(access.accessAllowed?'overview':'onboarding');
 
     } catch (error) {
 
@@ -5975,17 +5989,17 @@ function handleFormError(error, form) {
     toast(message, 'error');
   }
 }
-function handleOnboardingBlock(error){if(error?.code!=='HOST_ONBOARDING_INCOMPLETE')return false;loadOnboarding().finally(()=>go('onboarding'));toast('Complete your account setup before using booking and payment features.','error');return true;}
+function handleOnboardingBlock(error){if(!['HOST_ONBOARDING_INCOMPLETE','HOST_VERIFICATION_REQUIRED','HOST_ACCOUNT_SUSPENDED'].includes(error?.code))return false;loadHostAccessState().finally(()=>go('onboarding'));toast(error.message||'Review your account setup to continue.','error');return true;}
 function showHostError(route, error) { if(handleOnboardingBlock(error))return;if (error?.status === 401) { state.host = null; go('login'); toast(error.code === 'AUTH_SESSION_EXPIRED' ? 'Your session has expired. Please sign in again.' : 'Please sign in to continue.', 'error'); return; } app.innerHTML = hostShell(route, `${heading(pageTitle(route))}${emptyState('!', 'Unable to load this page', 'Please try again in a moment.', '<button class="button" type="button" id="retry-page">Try again</button>')}`); bindShell(); $('#retry-page').addEventListener('click', renderRoute); }
-function bindShell() { $('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Server logout is idempotent; always return to sign-in. */ } state.host = null; state.onboarding=null; go('login'); }); }
+function bindShell() { const sidebar=$('#host-sidebar'),backdrop=$('#mobile-menu-backdrop'),menu=$('#mobile-menu-button');const closeMenu=()=>{sidebar?.classList.remove('mobile-open');if(backdrop)backdrop.hidden=true;if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation menu');}};menu?.addEventListener('click',()=>{const open=!sidebar.classList.contains('mobile-open');sidebar.classList.toggle('mobile-open',open);backdrop.hidden=!open;menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu');});backdrop?.addEventListener('click',closeMenu);$$('#host-sidebar a').forEach(link=>link.addEventListener('click',closeMenu));[menu,sidebar].forEach(element=>element?.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();}));$('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Server logout is idempotent; always return to sign-in. */ } state.host = null; state.onboarding=null;state.operationalAccess=null; go('login'); }); }
 
 async function renderRoute() {
   if (isPublicRoute()) { await renderPublicGuest(); bindPublicForms(); return; }
-  const route = hashRoute(); if (route === 'login' || route === 'register') { try{state.host=await get('/api/me');await routeForOnboarding();return;}catch(_){state.host=null;state.onboarding=null;renderAuth(route);return;} }
-  try { state.host = state.host || await get('/api/me'); state.onboarding=await loadOnboarding(); } catch (error) { state.host = null; state.onboarding=null; go('login'); if (error?.code === 'AUTH_SESSION_EXPIRED') toast('Your session has expired. Please sign in again.', 'error'); return; }
-  if(!state.onboarding.ready&&!['onboarding','properties/new','settings'].includes(route)){go('onboarding');toast('Complete your account setup before using booking operations.','error');return;}
+  const route = hashRoute(); if (route === 'login' || route === 'register') { try{state.host=await get('/api/me');await routeForOnboarding();return;}catch(_){state.host=null;state.onboarding=null;state.operationalAccess=null;renderAuth(route);return;} }
+  try { state.host = state.host || await get('/api/me'); await loadHostAccessState(); } catch (error) { state.host = null; state.onboarding=null;state.operationalAccess=null; go('login'); if (error?.code === 'AUTH_SESSION_EXPIRED') toast('Your session has expired. Please sign in again.', 'error'); return; }
+  if(!state.operationalAccess.accessAllowed&&!['onboarding','settings'].includes(route)){go('onboarding');toast(state.operationalAccess.message||'Review your account status to continue.','error');return;}
   if(route==='onboarding')return renderOnboarding();
-  if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route === 'properties/new') return renderPropertyForm(null); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go(state.onboarding.ready?'overview':'onboarding');
+  if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route === 'properties/new') return renderPropertyForm(null); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go(state.operationalAccess.accessAllowed?'overview':'onboarding');
 }
 
 window.addEventListener('hashchange', renderRoute);
