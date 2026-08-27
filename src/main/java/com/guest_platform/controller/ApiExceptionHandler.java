@@ -21,6 +21,7 @@ import com.guest_platform.exception.AdminInvalidCredentialsException;
 import com.guest_platform.exception.AdminAccountDisabledException;
 import com.guest_platform.exception.LifecycleConflictException;
 import com.guest_platform.exception.LifecycleNotFoundException;
+import com.guest_platform.exception.HostOnboardingIncompleteException;
 import org.springframework.security.access.AccessDeniedException;
 import com.guest_platform.service.payment.PaystackApiClient.PaystackRequestRejectedException;
 
@@ -63,6 +64,17 @@ public class ApiExceptionHandler {
     @ExceptionHandler(LifecycleNotFoundException.class)
     ResponseEntity<ApiErrorResponse> lifecycleNotFound(LifecycleNotFoundException exception) {
         return response(HttpStatus.NOT_FOUND, exception.getCode(), exception.getMessage(), null, false, null);
+    }
+
+    @ExceptionHandler(HostOnboardingIncompleteException.class)
+    ResponseEntity<ApiErrorResponse> onboardingIncomplete(HostOnboardingIncompleteException exception) {
+        var state=exception.getOnboarding();
+        Map<String,String> details=new java.util.LinkedHashMap<>();
+        details.put("verificationComplete",Boolean.toString(state.verification().complete()));
+        details.put("agreementComplete",Boolean.toString(state.agreement().complete()));
+        details.put("propertyComplete",Boolean.toString(state.property().complete()));
+        details.put("payoutComplete",Boolean.toString(state.payout().complete()));
+        return response(HttpStatus.CONFLICT,"HOST_ONBOARDING_INCOMPLETE",exception.getMessage(),null,false,details);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

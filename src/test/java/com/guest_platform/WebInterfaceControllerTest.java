@@ -55,6 +55,21 @@ class WebInterfaceControllerTest {
         mvc.perform(get("/api/public/guest/not-a-valid-token"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void hostOnboardingJourneyIsPresentWithoutEmbeddingSensitiveState() throws Exception {
+        mvc.perform(get("/js/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/api/me/onboarding")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/api/me/verification")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/api/me/agreement/accept")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Add your first property")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Set up payouts")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Your Hostvero account is ready.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("HOST_ONBOARDING_INCOMPLETE")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("idFingerprint"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("recipientCode"))));
+    }
     @Test
 void propertyCreationRouteIsExplicitAndNavigationBreakpointIsMobileOnly() throws Exception {
     mvc.perform(get("/js/app.js"))

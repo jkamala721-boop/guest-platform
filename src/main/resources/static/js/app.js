@@ -62,36 +62,63 @@ const navItems = [
   ['payments', 'Payments'],
   ['notifications', 'Notifications']
 ];
-const state = { host: null, bookings: [], properties: [], guests: [] };
+const state = { host: null, onboarding: null, bookings: [], properties: [], guests: [] };
 
 const hashRoute = () => location.hash.replace(/^#\/?/, '') || 'overview';
 const go = (route) => { location.hash = `#/${route}`; };
 const isPublicRoute = () => location.pathname.startsWith('/guest/');
 const initials = (name = '') => name.split(/\s+/).filter(Boolean).slice(0, 2).map(value => value[0]).join('').toUpperCase() || 'HV';
 const dateInput = (date = '') => String(date || '').slice(0, 10);
-const pageTitle = route => ({ overview: 'Overview', bookings: 'Bookings', guests: 'Guests', properties: 'Properties', payments: 'Payments', notifications: 'Notifications', settings: 'Settings' })[route] || 'Hostvero';
+const pageTitle = route => ({ onboarding: 'Setup', overview: 'Overview', bookings: 'Bookings', guests: 'Guests', properties: 'Properties', payments: 'Payments', notifications: 'Notifications', settings: 'Settings' })[route] || 'Hostvero';
+
+async function loadOnboarding() { state.onboarding = await get('/api/me/onboarding'); return state.onboarding; }
+async function routeForOnboarding() { const onboarding = await loadOnboarding(); go(onboarding.ready ? 'overview' : 'onboarding'); }
+
+function onboardingStep(title, complete, stateLabel, body) {
+  return `<article class="card card-pad onboarding-step ${complete ? 'complete' : ''}"><header class="onboarding-step-header"><div><span class="onboarding-step-mark">${complete ? '✓' : '•'}</span><h2>${escapeHtml(title)}</h2></div><span class="badge ${complete ? 'active' : 'pending-payment'}">${escapeHtml(complete ? 'Complete' : stateLabel)}</span></header>${body || ''}</article>`;
+}
+
+async function renderOnboarding() {
+  app.innerHTML = hostShell('onboarding', `${heading('Set up your Hostvero account','Complete these four requirements before creating bookings and guest links.')}<section class="onboarding-list">${loadingCards()}</section>`); bindShell();
+  try {
+    const [onboarding, verification, agreement] = await Promise.all([loadOnboarding(), get('/api/me/verification'), get('/api/me/agreement').catch(error=>{if(error?.status===404)return null;throw error;})]);
+    const verificationForm = ['UNVERIFIED','REJECTED'].includes(verification.status) ? `<form id="verification-form" class="onboarding-form"><div class="form-grid"><div class="field"><label>Legal name</label><input name="legalName" required maxlength="160"></div><div class="field"><label>Verification type</label><select name="verificationType" required><option value="INDIVIDUAL">Individual</option><option value="SOLE_PROPRIETOR">Sole proprietor</option><option value="REGISTERED_BUSINESS">Registered business</option></select></div><div class="field"><label>Document country</label><select name="countryCode" id="verification-country" required><option value="KE">Kenya (KE)</option><option value="CD">DR Congo (CD)</option></select></div><div class="field"><label>Document type</label><select name="idType" id="verification-id-type" required><option value="NATIONAL_ID">National ID</option><option value="PASSPORT">Passport</option></select></div><div class="field"><label>ID or passport number</label><input name="idNumber" required maxlength="40" autocomplete="off"><span class="help">Used securely for verification; only a protected fingerprint and last four characters are retained.</span></div><div class="field"><label>Phone number</label><input name="phone" required maxlength="32" placeholder="+254… or +243…"><span class="help">Use a supported international number. Phone country may differ from document country.</span></div></div><div class="form-actions"><button class="button" type="submit">${verification.status==='REJECTED'?'Resubmit verification':'Submit for review'}</button></div></form>` : '';
+    const verificationBody = verification.status==='SUBMITTED'?'<div class="notice">Submitted for review. Hostvero will update this step after review.</div>':verification.status==='UNDER_REVIEW'?'<div class="notice">Review in progress. No further submission is needed.</div>':verification.status==='REJECTED'?`<div class="notice warning"><strong>Verification needs attention.</strong><p>${escapeHtml(verification.rejectionReason||'Please review your details and submit again.')}</p></div>${verificationForm}`:verification.status==='VERIFIED'?'<p class="muted">Your identity has been verified.</p>':verificationForm;
+    const agreementBody = !agreement?'<div class="notice">The Host Agreement is not available yet. You can continue the other setup steps and return here later.</div>':agreement.accepted?`<p class="muted">Accepted ${formatDateTime(agreement.acceptedAt)}.</p>`:`<div class="agreement-document"><h3>${escapeHtml(agreement.title||'Host Agreement')}</h3><p class="muted">Version ${escapeHtml(agreement.version)} · Effective ${formatDate(agreement.effectiveAt)}</p><div class="agreement-content">${escapeHtml(agreement.content)}</div></div><form id="agreement-form"><label class="agreement-ack"><input type="checkbox" name="acknowledged" required> I have read and agree to the current Host Agreement.</label><div class="form-actions"><button class="button" type="submit">Accept agreement</button></div></form>`;
+    const complete = onboarding.ready ? `<section class="card card-pad onboarding-complete"><h2>Your Hostvero account is ready.</h2><p>You can now create bookings and secure guest links.</p><a class="button" href="#/overview">Go to dashboard</a></section>` : '';
+    app.innerHTML = hostShell('onboarding', `${heading('Set up your Hostvero account','Complete these four requirements before creating bookings and guest links.')}${complete}<section class="onboarding-list">${onboardingStep('1. Verify identity',onboarding.verification.complete,verification.status==='REJECTED'?'Action required':verification.status==='SUBMITTED'||verification.status==='UNDER_REVIEW'?'Waiting for review':'Action required',verificationBody)}${onboardingStep('2. Accept Host Agreement',onboarding.agreement.complete,'Action required',agreementBody)}${onboardingStep('3. Add first property',onboarding.property.complete,'Action required',onboarding.property.complete?'<p class="muted">An active property is available.</p>':'<p>Add the first active property used for bookings and guest stays.</p><a class="button" href="#/properties/new">Add your first property</a>')}${onboardingStep('4. Configure payout',onboarding.payout.complete,'Action required',onboarding.payout.complete?'<p class="muted">Your payout destination is configured.</p>':'<p>Choose the verified destination where Hostvero should send payouts.</p><a class="button" href="#/settings">Set up payouts</a>')}</section>`); bindShell(); bindOnboarding();
+  } catch (error) { showHostError('onboarding',error); }
+}
+
+function bindOnboarding() {
+  const country=$('#verification-country'),idType=$('#verification-id-type'); const syncDocument=()=>{if(!country||!idType)return;const national=idType.querySelector('option[value="NATIONAL_ID"]');national.disabled=country.value!=='KE';if(national.disabled&&idType.value==='NATIONAL_ID')idType.value='PASSPORT';};country?.addEventListener('change',syncDocument);syncDocument();
+  $('#verification-form')?.addEventListener('submit',async event=>{event.preventDefault();const button=$('button[type="submit"]',event.currentTarget);setButtonBusy(button,true,'Submitting…');try{await post('/api/me/verification',Object.fromEntries(new FormData(event.currentTarget)));await Promise.all([get('/api/me/verification'),loadOnboarding()]);toast('Verification submitted for review.','success');renderOnboarding();}catch(error){handleFormError(error,event.currentTarget);}finally{setButtonBusy(button,false);}});
+  $('#agreement-form')?.addEventListener('submit',async event=>{event.preventDefault();const button=$('button[type="submit"]',event.currentTarget);setButtonBusy(button,true,'Accepting…');try{const agreement=await get('/api/me/agreement');await post('/api/me/agreement/accept',{version:agreement.version});await Promise.all([get('/api/me/agreement'),loadOnboarding()]);toast('Host Agreement accepted.','success');renderOnboarding();}catch(error){handleFormError(error,event.currentTarget);}finally{setButtonBusy(button,false);}});
+}
 
 function hostShell(route, content) {
   const active = route.split('/')[0];
+  const incomplete = state.onboarding && !state.onboarding.ready;
+  const visibleNav = incomplete ? [['onboarding','Setup'],['properties','Properties']] : navItems;
 
-  const nav = navItems.map(([key, label]) => `
+  const nav = visibleNav.map(([key, label]) => `
     <a
       href="#/${key}"
       class="nav-link ${active === key ? 'active' : ''}"
       aria-current="${active === key ? 'page' : 'false'}"
     >
-      <span class="nav-icon">${icons[key]}</span>
+      <span class="nav-icon">${icons[key] || icons.overview}</span>
       <span>${label}</span>
     </a>
   `).join('');
 
-  const mobile = navItems.slice(0, 5).map(([key, label]) => `
+  const mobile = visibleNav.slice(0, 5).map(([key, label]) => `
     <a
       href="#/${key}"
       class="${active === key ? 'active' : ''}"
       aria-current="${active === key ? 'page' : 'false'}"
     >
-      <span class="nav-icon">${icons[key]}</span>
+      <span class="nav-icon">${icons[key] || icons.overview}</span>
       <span>${label}</span>
     </a>
   `).join('');
@@ -153,13 +180,13 @@ function hostShell(route, content) {
 
           <div class="topbar-actions">
 
-            <a
+            ${incomplete ? '' : `<a
               class="button small topbar-create"
               href="#/bookings/new"
             >
               <span aria-hidden="true">+</span>
               New booking
-            </a>
+            </a>`}
 
             <a
               href="#/notifications"
@@ -2003,7 +2030,7 @@ async function renderBookingDetail(id) {
   }
 }
 
-async function createGuestLink(bookingId) { try { const link = await post(`/api/bookings/${bookingId}/guest-link`, {}); const url = `${location.origin}/guest/${link.token}`; sessionStorage.setItem(`hostvero.guest-link.${bookingId}`, url); const modal = openModal({ title: 'Guest link created', body: `<p class="notice">Copy this link now. For security, Hostvero never retrieves it from a token hash later.</p><div class="field" style="margin-top:1rem"><label for="guest-link-value">Secure guest link</label><input id="guest-link-value" readonly value="${escapeHtml(url)}"></div>`, actions: `<button class="button" type="button" data-copy-link>Copy link</button>` }); $('[data-copy-link]', modal.root).addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Guest link copied.', 'success'); } catch { $('#guest-link-value', modal.root).select(); toast('Select and copy the link.', ''); } }); } catch (error) { toast(error.message, 'error'); } }
+async function createGuestLink(bookingId) { try { const link = await post(`/api/bookings/${bookingId}/guest-link`, {}); const url = `${location.origin}/guest/${link.token}`; sessionStorage.setItem(`hostvero.guest-link.${bookingId}`, url); const modal = openModal({ title: 'Guest link created', body: `<p class="notice">Copy this link now. For security, Hostvero never retrieves it from a token hash later.</p><div class="field" style="margin-top:1rem"><label for="guest-link-value">Secure guest link</label><input id="guest-link-value" readonly value="${escapeHtml(url)}"></div>`, actions: `<button class="button" type="button" data-copy-link>Copy link</button>` }); $('[data-copy-link]', modal.root).addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Guest link copied.', 'success'); } catch { $('#guest-link-value', modal.root).select(); toast('Select and copy the link.', ''); } }); } catch (error) { if(!handleOnboardingBlock(error))toast(error.message, 'error'); } }
 
 function openManualNotification(bookingId) {
   const modal = openModal({ title: 'Send notification', body: '<form id="manual-notification-form"><div class="field"><label for="notification-channel">Channel</label><select id="notification-channel" name="channel"><option value="EMAIL">Email</option></select></div><div class="field"><label for="notification-subject">Subject</label><input id="notification-subject" name="subject" maxlength="200" required></div><div class="field"><label for="notification-message">Message</label><textarea id="notification-message" name="message" maxlength="4000" required></textarea></div><div class="form-actions"><button class="button secondary" type="button" data-close>Cancel</button><button class="button" type="submit">Send</button></div></form>' });
@@ -3091,7 +3118,7 @@ async function renderPropertyForm(id) {
             'success'
           );
 
-          go(`properties/${saved.id}`);
+          if(id)go(`properties/${saved.id}`);else{await loadOnboarding();go('onboarding');}
 
         } catch (error) {
 
@@ -4560,6 +4587,7 @@ const payoutForm = `
           );
 
           await put('/api/me/payout-settings', formData);
+          await loadOnboarding();
 
           if (formData.payoutMethod === 'MPESA') {
             toast(
@@ -4573,7 +4601,7 @@ const payoutForm = `
             );
           }
 
-          renderSettings();
+          go('onboarding');
         } catch (error) {
           handleFormError(error, event.currentTarget);
         } finally {
@@ -4996,15 +5024,9 @@ function renderAuth(mode = 'login') {
       );
 
       state.host = response.host;
-
-      toast(
-        registration
-          ? 'Your Hostvero account is ready.'
-          : 'Welcome back.',
-        'success'
-      );
-
-      go('overview');
+      const onboarding=await loadOnboarding();
+      toast(registration?'Your account was created. Complete setup to start operating.':'Welcome back.','success');
+      go(onboarding.ready?'overview':'onboarding');
 
     } catch (error) {
 
@@ -5933,6 +5955,7 @@ function renderGuestUnavailable() {
 function notificationLabel(type) { return ({ TWO_DAY_REMINDER: 'Two-day arrival reminder', TWENTY_FOUR_HOUR_PAYMENT_REQUEST: '24-hour payment request', PAYMENT_REMINDER: 'Payment reminder', CHECKOUT_REMINDER: 'Checkout reminder' })[type] || titleCase(type); }
 function guestLinkState(value) { return value === 'REGISTRATION_OR_PAYMENT' ? 'Guest registration and payment link ready' : titleCase(value); }
 function handleFormError(error, form) {
+  if(handleOnboardingBlock(error))return;
   const message = error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
   $$('.field-error', form).forEach(item => item.remove());
 
@@ -5952,14 +5975,17 @@ function handleFormError(error, form) {
     toast(message, 'error');
   }
 }
-function showHostError(route, error) { if (error?.status === 401) { state.host = null; go('login'); toast(error.code === 'AUTH_SESSION_EXPIRED' ? 'Your session has expired. Please sign in again.' : 'Please sign in to continue.', 'error'); return; } app.innerHTML = hostShell(route, `${heading(pageTitle(route))}${emptyState('!', 'Unable to load this page', 'Please try again in a moment.', '<button class="button" type="button" id="retry-page">Try again</button>')}`); bindShell(); $('#retry-page').addEventListener('click', renderRoute); }
-function bindShell() { $('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Server logout is idempotent; always return to sign-in. */ } state.host = null; go('login'); }); }
+function handleOnboardingBlock(error){if(error?.code!=='HOST_ONBOARDING_INCOMPLETE')return false;loadOnboarding().finally(()=>go('onboarding'));toast('Complete your account setup before using booking and payment features.','error');return true;}
+function showHostError(route, error) { if(handleOnboardingBlock(error))return;if (error?.status === 401) { state.host = null; go('login'); toast(error.code === 'AUTH_SESSION_EXPIRED' ? 'Your session has expired. Please sign in again.' : 'Please sign in to continue.', 'error'); return; } app.innerHTML = hostShell(route, `${heading(pageTitle(route))}${emptyState('!', 'Unable to load this page', 'Please try again in a moment.', '<button class="button" type="button" id="retry-page">Try again</button>')}`); bindShell(); $('#retry-page').addEventListener('click', renderRoute); }
+function bindShell() { $('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Server logout is idempotent; always return to sign-in. */ } state.host = null; state.onboarding=null; go('login'); }); }
 
 async function renderRoute() {
   if (isPublicRoute()) { await renderPublicGuest(); bindPublicForms(); return; }
-  const route = hashRoute(); if (route === 'login' || route === 'register') { renderAuth(route); return; }
-  try { state.host = state.host || await get('/api/me'); } catch (error) { state.host = null; go('login'); if (error?.code === 'AUTH_SESSION_EXPIRED') toast('Your session has expired. Please sign in again.', 'error'); return; }
-  if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route === 'properties/new') return renderPropertyForm(null); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go('overview');
+  const route = hashRoute(); if (route === 'login' || route === 'register') { try{state.host=await get('/api/me');await routeForOnboarding();return;}catch(_){state.host=null;state.onboarding=null;renderAuth(route);return;} }
+  try { state.host = state.host || await get('/api/me'); state.onboarding=await loadOnboarding(); } catch (error) { state.host = null; state.onboarding=null; go('login'); if (error?.code === 'AUTH_SESSION_EXPIRED') toast('Your session has expired. Please sign in again.', 'error'); return; }
+  if(!state.onboarding.ready&&!['onboarding','properties/new','settings'].includes(route)){go('onboarding');toast('Complete your account setup before using booking operations.','error');return;}
+  if(route==='onboarding')return renderOnboarding();
+  if (route === 'overview') return renderOverview(); if (route.startsWith('bookings')) return renderBookings(route); if (route.startsWith('guests')) return renderGuests(route); if (route === 'properties/new') return renderPropertyForm(null); if (route.startsWith('properties')) return renderProperties(route); if (route === 'payments') return renderPayments(); if (route === 'notifications') return renderNotifications(); if (route === 'settings') return renderSettings(); go(state.onboarding.ready?'overview':'onboarding');
 }
 
 window.addEventListener('hashchange', renderRoute);

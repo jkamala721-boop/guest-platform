@@ -50,12 +50,14 @@ public class GuestLinkService {
     private final PropertyAccessEncryptionService propertyAccessEncryptionService;
     private final GuestIdentityFingerprintService identityFingerprintService;
     private final long emailVerificationResendCooldownSeconds;
+    private final HostOnboardingService onboardingService;
 
     public GuestLinkService(BookingRepository bookingRepository, GuestLinkRepository guestLinkRepository,
             PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
             GuestRepository guestRepository, NotificationService notificationService,
             PropertyAccessEncryptionService propertyAccessEncryptionService, GuestIdentityFingerprintService identityFingerprintService,
-            @Value("${app.guest-email-verification.resend-cooldown-seconds:60}") long emailVerificationResendCooldownSeconds) {
+            @Value("${app.guest-email-verification.resend-cooldown-seconds:60}") long emailVerificationResendCooldownSeconds,
+            HostOnboardingService onboardingService) {
         this.bookingRepository = bookingRepository;
         this.guestLinkRepository = guestLinkRepository;
         this.paymentRepository = paymentRepository;
@@ -65,10 +67,12 @@ public class GuestLinkService {
         this.propertyAccessEncryptionService = propertyAccessEncryptionService;
         this.identityFingerprintService = identityFingerprintService;
         this.emailVerificationResendCooldownSeconds = emailVerificationResendCooldownSeconds;
+        this.onboardingService = onboardingService;
     }
 
     @Transactional
     public GuestLinkCreateResponse rotate(UUID hostId, UUID bookingId) {
+        onboardingService.requireReady(hostId);
         Booking booking = bookingRepository.findByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
         if (booking.getStatus() == BookingStatus.CANCELLED) {

@@ -37,12 +37,13 @@ public class BookingService {
     private final PaymentRepository paymentRepository;
     private final GuestLinkService guestLinkService;
     private final HostNotificationService hostNotificationService;
+    private final HostOnboardingService onboardingService;
 
     public BookingService(HostRepository hostRepository, PropertyRepository propertyRepository,
             GuestRepository guestRepository, BookingRepository bookingRepository,
             AvailabilityService availabilityService, NotificationService notificationService,
             PaymentRepository paymentRepository, GuestLinkService guestLinkService,
-            HostNotificationService hostNotificationService) {
+            HostNotificationService hostNotificationService, HostOnboardingService onboardingService) {
         this.hostRepository = hostRepository;
         this.propertyRepository = propertyRepository;
         this.guestRepository = guestRepository;
@@ -52,10 +53,12 @@ public class BookingService {
         this.paymentRepository = paymentRepository;
         this.guestLinkService = guestLinkService;
         this.hostNotificationService = hostNotificationService;
+        this.onboardingService = onboardingService;
     }
 
     @Transactional
     public BookingResponse create(UUID hostId, BookingCreateRequest request) {
+        onboardingService.requireReady(hostId);
         Host host = findActiveHost(hostId);
 
         Property property = findActiveOwnedProperty(
