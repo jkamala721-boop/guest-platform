@@ -37,6 +37,7 @@ import com.guest_platform.service.AdminBootstrapService;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:admin-security;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
         "app.admin.bootstrap.email=owner-admin@hostvero.net",
         "app.admin.bootstrap.password=AdminStrongPass!123",
         "app.admin.bootstrap.name=Hostvero Owner",

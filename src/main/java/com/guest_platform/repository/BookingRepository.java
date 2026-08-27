@@ -1,6 +1,7 @@
 package com.guest_platform.repository;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -47,4 +48,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     boolean existsByPropertyIdAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThanAndIdNot(UUID propertyId,
             Collection<BookingStatus> statuses, LocalDate checkOutDate, LocalDate checkInDate, UUID bookingId);
+
+    @Query("select booking.host.id as hostId,booking.status as status,count(booking) as statusCount,max(booking.updatedAt) as lastActivityAt from Booking booking where booking.host.id in :hostIds group by booking.host.id,booking.status")
+    List<HostBookingStatusSummary> summarizeByHostIds(@Param("hostIds") Collection<UUID> hostIds);
+    interface HostBookingStatusSummary { UUID getHostId(); BookingStatus getStatus(); Long getStatusCount(); Instant getLastActivityAt(); }
 }

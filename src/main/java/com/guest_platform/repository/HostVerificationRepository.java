@@ -3,6 +3,7 @@ import java.util.*; import org.springframework.data.jpa.repository.*; import org
 import com.guest_platform.entity.HostVerification;
 public interface HostVerificationRepository extends JpaRepository<HostVerification,UUID>{
  Optional<HostVerification> findByHostId(UUID hostId);
+ List<HostVerification> findAllByHostIdIn(Collection<UUID> hostIds);
  @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select v from HostVerification v where v.host.id=:hostId") Optional<HostVerification> findForUpdateByHostId(@Param("hostId") UUID hostId);
  List<HostVerification> findAllByOrderBySubmittedAtDesc();
 }
