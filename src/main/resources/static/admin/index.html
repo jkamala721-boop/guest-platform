@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Hostvero Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div id="login-view" class="login-page" hidden>
+    <main class="login-card" aria-labelledby="login-title">
+      <p class="eyebrow">HOSTVERO OPERATIONS</p><h1 id="login-title">Admin sign in</h1>
+      <p class="muted">Use your authorized management account.</p>
+      <form id="login-form"><label>Email<input id="login-email" name="email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="login-password" name="password" type="password" autocomplete="current-password" required></label>
+        <p id="login-error" class="alert error" role="alert" hidden></p><button class="primary full" type="submit">Sign in</button>
+      </form>
+    </main>
+  </div>
+  <div id="app-shell" class="shell" hidden>
+    <aside class="sidebar"><div><p class="brand">Hostvero</p><p class="eyebrow">MANAGEMENT</p></div>
+      <nav aria-label="Admin navigation"><a href="#/dashboard" data-nav="dashboard">Dashboard</a><a href="#/hosts" data-nav="hosts">Hosts</a><a href="#/payouts" data-nav="payouts">Payouts</a></nav>
+      <button id="logout-button" class="quiet">Log out</button>
+    </aside>
+    <div class="workspace"><header class="topbar"><button id="menu-button" class="menu" aria-label="Toggle navigation">☰</button><div><span id="admin-name"></span><span id="admin-role" class="badge"></span></div></header>
+      <main id="content" tabindex="-1"></main>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/admin/admin-api.js" defer></script><script src="/admin/admin-app.js" defer></script>
+</body>
+</html>
