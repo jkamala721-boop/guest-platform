@@ -83,6 +83,34 @@ class WebInterfaceControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("idFingerprint"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("recipientCode"))));
     }
+
+    @Test
+    void globalCountrySelectorAndHostOnlyPwaContractsArePresent() throws Exception {
+        mvc.perform(get("/manifest.webmanifest"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"name\": \"Hostvero\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"start_url\": \"/#/overview\"")));
+        mvc.perform(get("/service-worker.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("url.pathname.startsWith('/api/')")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("cache: 'no-store'")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("password"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("recipientCode"))));
+        mvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/manifest.webmanifest")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("apple-mobile-web-app-capable")));
+        mvc.perform(get("/admin/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/manifest.webmanifest"))));
+        mvc.perform(get("/js/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/api/reference/countries")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("role=\"combobox\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("No countries found")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Install Hostvero")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Add to Home Screen")));
+    }
     @Test
 void propertyCreationRouteIsExplicitAndNavigationBreakpointIsMobileOnly() throws Exception {
     mvc.perform(get("/js/app.js"))

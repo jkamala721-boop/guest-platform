@@ -115,7 +115,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/", "/index.html", "/guest/**", "/admin/**", "/css/**", "/js/**", "/images/**",
-                                "/favicon.ico").permitAll()
+                                "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html").permitAll()
                         .requestMatchers("/api/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/public/guest/**").permitAll()

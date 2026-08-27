@@ -1,0 +1,16 @@
+{
+  "name": "Hostvero",
+  "short_name": "Hostvero",
+  "description": "Hostvero guest and stay operations for hosts.",
+  "start_url": "/#/overview",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#0d47a1",
+  "orientation": "any",
+  "icons": [
+    { "src": "/images/pwa/hostvero-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/images/pwa/hostvero-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/images/pwa/hostvero-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
