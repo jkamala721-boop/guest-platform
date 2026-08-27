@@ -10,5 +10,5 @@ public class HostAgreementAcceptance {
  protected HostAgreementAcceptance(){}
  public HostAgreementAcceptance(Host host,HostAgreementVersion version,String ipHash,String userAgent){this.host=host;this.agreementVersion=version;this.eventType="HOST_AGREEMENT_ACCEPTED";this.ipAddressHash=ipHash;this.userAgentSummary=userAgent;}
  @PrePersist void create(){if(id==null)id=UUID.randomUUID();Instant now=Instant.now().truncatedTo(ChronoUnit.MICROS);acceptedAt=createdAt=now;}
- public Instant getAcceptedAt(){return acceptedAt;} public HostAgreementVersion getAgreementVersion(){return agreementVersion;} public String getEventType(){return eventType;} public String getIpAddressHash(){return ipAddressHash;} public String getUserAgentSummary(){return userAgentSummary;}
+ public UUID getId(){return id;} public Host getHost(){return host;} public Instant getAcceptedAt(){return acceptedAt;} public HostAgreementVersion getAgreementVersion(){return agreementVersion;} public String getEventType(){return eventType;} public String getIpAddressHash(){return ipAddressHash;} public String getUserAgentSummary(){return userAgentSummary;}
 }

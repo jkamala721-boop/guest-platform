@@ -13,6 +13,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import com.guest_platform.entity.Booking;
 import com.guest_platform.entity.BookingStatus;
@@ -52,4 +54,5 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("select booking.host.id as hostId,booking.status as status,count(booking) as statusCount,max(booking.updatedAt) as lastActivityAt from Booking booking where booking.host.id in :hostIds group by booking.host.id,booking.status")
     List<HostBookingStatusSummary> summarizeByHostIds(@Param("hostIds") Collection<UUID> hostIds);
     interface HostBookingStatusSummary { UUID getHostId(); BookingStatus getStatus(); Long getStatusCount(); Instant getLastActivityAt(); }
+    Page<Booking> findByHostId(UUID hostId, Pageable pageable);
 }

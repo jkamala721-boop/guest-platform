@@ -50,4 +50,7 @@ public interface HostPayoutRepository extends JpaRepository<HostPayout, UUID> {
     @EntityGraph(attributePaths = {"host", "payment", "payment.booking"})
     @Query("select payout from HostPayout payout where payout.id=:id")
     Optional<HostPayout> findAdminDetailById(@Param("id") UUID id);
+
+    @EntityGraph(attributePaths = {"payment", "payment.booking"})
+    Page<HostPayout> findByHostId(UUID hostId, Pageable pageable);
 }

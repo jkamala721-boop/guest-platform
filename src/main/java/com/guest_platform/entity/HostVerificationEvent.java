@@ -11,5 +11,7 @@ public class HostVerificationEvent {
  protected HostVerificationEvent(){}
  public HostVerificationEvent(HostVerification v,String actorType,UUID actorId,String event,HostVerificationStatus previous,HostVerificationStatus next,String reason){this.verification=v;this.actorType=actorType;this.actorId=actorId;this.eventType=event;this.previousStatus=previous;this.newStatus=next;this.reason=reason;}
  @PrePersist void create(){if(id==null)id=UUID.randomUUID();createdAt=Instant.now();}
- public String getEventType(){return eventType;} public String getReason(){return reason;} public HostVerificationStatus getNewStatus(){return newStatus;}
+ public UUID getId(){return id;} public HostVerification getVerification(){return verification;} public String getActorType(){return actorType;}
+ public UUID getActorId(){return actorId;} public String getEventType(){return eventType;} public String getReason(){return reason;}
+ public HostVerificationStatus getNewStatus(){return newStatus;} public Instant getCreatedAt(){return createdAt;}
 }
