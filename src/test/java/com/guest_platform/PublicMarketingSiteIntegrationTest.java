@@ -47,6 +47,25 @@ class PublicMarketingSiteIntegrationTest {
                 .andExpect(content().string(not(containsString("/api/admin"))));
     }
 
+    @Test void gtmIsLimitedToPublicMarketingHtml() throws Exception {
+        for (String page : new String[]{"index", "for-hosts", "for-guests", "pricing", "safety", "contact",
+                "privacy", "terms", "host-agreement"}) {
+            mvc.perform(get("/site/" + page + ".html")).andExpect(status().isOk())
+                    .andExpect(content().string(containsString(
+                            "<head><!-- Google Tag Manager --><script>")))
+                    .andExpect(content().string(containsString("GTM-5349TBPM")))
+                    .andExpect(content().string(containsString(
+                            "<body><!-- Google Tag Manager (noscript) --><noscript><iframe")))
+                    .andExpect(content().string(containsString(
+                            "https://www.googletagmanager.com/ns.html?id=GTM-5349TBPM")));
+        }
+
+        mvc.perform(get("/index.html")).andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("GTM-5349TBPM"))));
+        mvc.perform(get("/admin/index.html")).andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("GTM-5349TBPM"))));
+    }
+
     @Test void publicAndLegalRoutesResolve() throws Exception {
         for(String route : new String[]{"/for-hosts","/for-guests","/pricing","/safety","/contact","/privacy","/terms","/host-agreement"}) {
             mvc.perform(get(route).header("Host","hostvero.net"))
