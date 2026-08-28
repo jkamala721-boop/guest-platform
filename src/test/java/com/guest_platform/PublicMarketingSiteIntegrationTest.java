@@ -56,6 +56,16 @@ class PublicMarketingSiteIntegrationTest {
                 .andExpect(content().string(containsString("5%")));
     }
 
+    @Test void verifiedPublicSupportEmailIsPublishedWithoutPlaceholderOrPhone() throws Exception {
+        mvc.perform(get("/site/contact.html")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("support@hostvero.net")))
+                .andExpect(content().string(containsString("mailto:support@hostvero.net")))
+                .andExpect(content().string(not(containsString(
+                        "Hostvero support contact details will be available before public launch."))))
+                .andExpect(content().string(not(containsString("tel:"))))
+                .andExpect(content().string(not(containsString("Phone"))));
+    }
+
     @Test void draftLegalPagesAreNotIndexedOrPublishedInSitemap() throws Exception {
         mvc.perform(get("/site/privacy.html")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("Legal review required before launch.")))
