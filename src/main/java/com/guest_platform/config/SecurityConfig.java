@@ -116,6 +116,9 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/", "/index.html", "/guest/**", "/admin/**", "/css/**", "/js/**", "/images/**",
                                 "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html").permitAll()
+                        .requestMatchers("/for-hosts", "/for-guests", "/pricing", "/safety", "/contact",
+                                "/privacy", "/terms", "/host-agreement", "/robots.txt", "/sitemap.xml",
+                                "/site/**").permitAll()
                         .requestMatchers("/api/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/public/guest/**").permitAll()

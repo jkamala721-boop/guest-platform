@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /guest/
+Sitemap: https://hostvero.net/sitemap.xml
