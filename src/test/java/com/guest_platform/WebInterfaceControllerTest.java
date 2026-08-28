@@ -111,6 +111,31 @@ class WebInterfaceControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Install Hostvero")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Add to Home Screen")));
     }
+
+    @Test
+    void guidedMobileVerificationFlowUsesAuthoritativeCountrySelection() throws Exception {
+        mvc.perform(get("/js/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Choose document country")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Search countries")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Choose your document country first.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("document-type-card")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Passport verification is currently available")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Your phone can be from a different country")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Review and submit")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("last4=raw.slice(-4)")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("escapeHtml(last4)")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("escapeHtml(raw)"))))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("filterCountries")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("country.code.toLocaleLowerCase().includes")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("countryValue.value=country.code")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("if(!$('#verification-country').value)")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("idFingerprint"))));
+        mvc.perform(get("/service-worker.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("url.pathname.startsWith('/api/')")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("cache: 'no-store'")));
+    }
     @Test
 void propertyCreationRouteIsExplicitAndNavigationBreakpointIsMobileOnly() throws Exception {
     mvc.perform(get("/js/app.js"))
