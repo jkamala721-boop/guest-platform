@@ -42,7 +42,8 @@ public class SecurityConfig {
             + "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; "
             + "connect-src 'self'; frame-src https://checkout.paystack.com https://checkout.stripe.com";
     static final String MARKETING_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'self'; object-src 'none'; "
-            + "frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.googletagmanager.com; "
+            + "frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.googletagmanager.com "
+            + "'sha256-DMbUiHFoJGhQLvd5TvxNVGbE8YkI7a61I4XVOl9zW+k='; "
             + "style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com "
             + "https://www.googletagmanager.com; font-src 'self' data:; connect-src 'self' "
             + "https://www.google-analytics.com https://region1.google-analytics.com "
