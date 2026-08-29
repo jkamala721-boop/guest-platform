@@ -41,6 +41,12 @@ public class Property {
     @Column(name = "maps_url", nullable = false, length = 2048)
     private String mapsUrl;
 
+    @Column(name = "house_number", length = 100)
+    private String houseNumber;
+
+    @Column(name = "block_name", length = 100)
+    private String blockName;
+
     @Column(name = "max_guests", nullable = false)
     private int maxGuests;
 
@@ -119,7 +125,8 @@ public class Property {
     }
 
     public void update(String name, PropertyType propertyType, String address, String mapsUrl,
-            int maxGuests, BigDecimal defaultNightlyRate, String currency, LocalTime checkInTime,
+            String houseNumber, String blockName, int maxGuests, BigDecimal defaultNightlyRate,
+            String currency, LocalTime checkInTime,
             LocalTime checkOutTime, String wifiName, String wifiPassword, String houseRules,
             String checkInInstructions, String contactPhone, boolean active, PropertyAccessMethod accessMethod,
             String accessCodeCiphertext, String accessLocationInstructions, String parkingEntryInstructions,
@@ -128,6 +135,8 @@ public class Property {
         this.propertyType = propertyType;
         this.address = address;
         this.mapsUrl = mapsUrl;
+        setHouseNumber(houseNumber);
+        setBlockName(blockName);
         this.maxGuests = maxGuests;
         this.defaultNightlyRate = defaultNightlyRate;
         this.currency = currency;
@@ -152,6 +161,8 @@ public class Property {
     public PropertyType getPropertyType() { return propertyType; }
     public String getAddress() { return address; }
     public String getMapsUrl() { return mapsUrl; }
+    public String getHouseNumber() { return houseNumber; }
+    public String getBlockName() { return blockName; }
     public int getMaxGuests() { return maxGuests; }
     public BigDecimal getDefaultNightlyRate() { return defaultNightlyRate; }
     public String getCurrency() { return currency; }
@@ -170,4 +181,21 @@ public class Property {
     public boolean isActive() { return active; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    public void setHouseNumber(String houseNumber) {
+        this.houseNumber = normalizeCheckinLocation(houseNumber, "House / Unit number");
+    }
+
+    public void setBlockName(String blockName) {
+        this.blockName = normalizeCheckinLocation(blockName, "Block / Building section");
+    }
+
+    private static String normalizeCheckinLocation(String value, String fieldLabel) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.trim();
+        if (normalized.length() > 100) {
+            throw new IllegalArgumentException(fieldLabel + " must not exceed 100 characters");
+        }
+        return normalized;
+    }
 }

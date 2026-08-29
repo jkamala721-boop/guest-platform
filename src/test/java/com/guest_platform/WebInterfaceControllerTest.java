@@ -51,11 +51,17 @@ class WebInterfaceControllerTest {
     }
 
     @Test
-    void bookingCheckinLocationFieldsUseExistingFormsAndGuestSafeRendering() throws Exception {
+    void propertyCheckinLocationFieldsUsePropertyFormAndGuestSafeRendering() throws Exception {
         mvc.perform(get("/js/app.js"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"property-house-number\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"property-block-name\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"houseNumber\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"blockName\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("id=\"booking-house-number\""))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("id=\"booking-block-name\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("maxlength=\"100\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("House / Unit number")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Block / Building section")))

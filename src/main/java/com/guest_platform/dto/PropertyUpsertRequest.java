@@ -20,6 +20,8 @@ public record PropertyUpsertRequest(
         @NotNull PropertyType propertyType,
         @NotBlank @Size(max = 500) String address,
         @NotBlank @Size(max = 2048) @Pattern(regexp = "https?://.+", message = "mapsUrl must be an HTTP(S) URL") String mapsUrl,
+        @Size(max = 100) String houseNumber,
+        @Size(max = 100) String blockName,
         @NotNull @Min(1) @Max(10000) Integer maxGuests,
         @NotNull @DecimalMin(value = "0.00") @Digits(integer = 10, fraction = 2) BigDecimal defaultNightlyRate,
         @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,

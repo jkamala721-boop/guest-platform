@@ -23,8 +23,6 @@ public record BookingCreateRequest(
         @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
         BookingStatus status,
         GuestAccessPolicy guestAccessPolicy,
-        @Size(max = 100) String houseNumber,
-        @Size(max = 100) String blockName,
         @Size(max = 2000) String notes,
         @Size(max = 2000) String checkoutReminderMessage) {
 }

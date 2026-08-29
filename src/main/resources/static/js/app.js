@@ -1019,34 +1019,6 @@ async function renderBookingForm(existing = null) {
 
             </div>
 
-            <div class="field">
-              <label for="booking-house-number">
-                House / Unit number
-                <span class="muted">(optional)</span>
-              </label>
-              <input
-                id="booking-house-number"
-                name="houseNumber"
-                maxlength="100"
-                placeholder="A12, Unit 4B, Villa 7"
-                value="${value('houseNumber')}"
-              >
-            </div>
-
-            <div class="field">
-              <label for="booking-block-name">
-                Block / Building section
-                <span class="muted">(optional)</span>
-              </label>
-              <input
-                id="booking-block-name"
-                name="blockName"
-                maxlength="100"
-                placeholder="Block B, Tower 2, West Wing"
-                value="${value('blockName')}"
-              >
-            </div>
-
             <div class="field full">
 
               <label>
@@ -1725,17 +1697,17 @@ async function renderBookingDetail(id) {
               </strong>
             </div>
 
-            ${booking.houseNumber ? `
+            ${property?.houseNumber ? `
               <div class="booking-detail-row">
                 <span>House / Unit number</span>
-                <strong>${escapeHtml(booking.houseNumber)}</strong>
+                <strong>${escapeHtml(property.houseNumber)}</strong>
               </div>
             ` : ''}
 
-            ${booking.blockName ? `
+            ${property?.blockName ? `
               <div class="booking-detail-row">
                 <span>Block / Building section</span>
-                <strong>${escapeHtml(booking.blockName)}</strong>
+                <strong>${escapeHtml(property.blockName)}</strong>
               </div>
             ` : ''}
 
@@ -2914,6 +2886,34 @@ async function renderPropertyForm(id) {
             <span class="help">
               Used to help guests find the property.
             </span>
+          </div>
+
+          <div class="field">
+            <label for="property-house-number">
+              House / Unit number
+              <span class="muted">(optional)</span>
+            </label>
+            <input
+              id="property-house-number"
+              name="houseNumber"
+              maxlength="100"
+              placeholder="A12, Unit 4B, Villa 7"
+              value="${value('houseNumber')}"
+            >
+          </div>
+
+          <div class="field">
+            <label for="property-block-name">
+              Block / Building section
+              <span class="muted">(optional)</span>
+            </label>
+            <input
+              id="property-block-name"
+              name="blockName"
+              maxlength="100"
+              placeholder="Block B, Tower 2, West Wing"
+              value="${value('blockName')}"
+            >
           </div>
 
 

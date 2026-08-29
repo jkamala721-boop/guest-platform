@@ -25,7 +25,7 @@ public record PublicGuestStayResponse(GuestLinkState state, Instant expiresAt, b
                         property.getAccessLocationInstructions(), property.getParkingEntryInstructions(),
                         property.getCheckOutInstructions()),
                 new StayDetails(booking.getCheckInDate(), booking.getCheckOutDate(),
-                        booking.getHouseNumber(), booking.getBlockName()),
+                        property.getHouseNumber(), property.getBlockName()),
                 new PaymentDetails(payment.getAmount(), payment.getCurrency(), payment.getStatus(), payment.getPaidAt()),
                 new ReceiptDetails(true, receipt.getReceiptNumber()));
     }

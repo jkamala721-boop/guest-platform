@@ -74,6 +74,7 @@ public class PropertyService {
 
     private void apply(Property property, PropertyUpsertRequest request) {
         property.update(request.name().trim(), request.propertyType(), request.address().trim(), request.mapsUrl().trim(),
+                request.houseNumber(), request.blockName(),
                 request.maxGuests(), request.defaultNightlyRate(), request.currency().toUpperCase(Locale.ROOT),
                 request.checkInTime(), request.checkOutTime(), normalizeOptional(request.wifiName()),
                 normalizeOptional(request.wifiPassword()), normalizeOptional(request.houseRules()),

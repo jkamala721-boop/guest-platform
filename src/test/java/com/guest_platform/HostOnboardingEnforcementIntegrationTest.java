@@ -101,7 +101,7 @@ class HostOnboardingEnforcementIntegrationTest {
  private Cookie cookie(Host host){return new Cookie("HOSTVERO_SESSION",sessions.create(host).value());}
  private Property property(Host host){return properties.findById(propertyService.create(host.getId(),propertyRequest()).id()).orElseThrow();}
  private PropertyUpsertRequest propertyRequest(){return new PropertyUpsertRequest("First Property",PropertyType.APARTMENT,
-   "Nairobi","https://maps.example/onboarding",2,new BigDecimal("3500"),"KES",LocalTime.of(14,0),LocalTime.of(10,0),
+    "Nairobi","https://maps.example/onboarding",null,null,2,new BigDecimal("3500"),"KES",LocalTime.of(14,0),LocalTime.of(10,0),
    null,null,null,null,null,null,null,null,null,"+254700000000",true);}
  private HostVerificationSubmissionRequest verificationRequest(){return new HostVerificationSubmissionRequest("Onboarding Host",
    HostVerificationType.INDIVIDUAL,HostIdentityType.NATIONAL_ID,"12345678","+254712345678","KE");}

@@ -44,8 +44,8 @@ public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Ins
         var property = booking.getProperty();
         return new StayAccessDetails(property.getMapsUrl(), property.getCheckInTime(), property.getCheckOutTime(),
                 property.getCheckInInstructions(), property.getWifiName(), property.getWifiPassword(),
-                property.getHouseRules(), property.getContactPhone(), booking.getHouseNumber(),
-                booking.getBlockName());
+                property.getHouseRules(), property.getContactPhone(), property.getHouseNumber(),
+                property.getBlockName());
     }
 
     public record PropertyPreview(String name, String location) {
