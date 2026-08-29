@@ -41,6 +41,12 @@ public class SecurityConfig {
             + "frame-ancestors 'none'; form-action 'self'; script-src 'self'; "
             + "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; "
             + "connect-src 'self'; frame-src https://checkout.paystack.com https://checkout.stripe.com";
+    static final String MARKETING_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'self'; object-src 'none'; "
+            + "frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.googletagmanager.com; "
+            + "style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com "
+            + "https://www.googletagmanager.com; font-src 'self' data:; connect-src 'self' "
+            + "https://www.google-analytics.com https://region1.google-analytics.com "
+            + "https://www.googletagmanager.com; frame-src https://www.googletagmanager.com";
     static final String PERMISSIONS_POLICY = "camera=(), geolocation=(), microphone=(), payment=(), usb=()";
 
     @Bean
@@ -106,7 +112,12 @@ public class SecurityConfig {
             PublicRateLimitFilter publicRateLimitFilter,
             CookieCsrfProtectionFilter cookieCsrfProtectionFilter,
             ApiErrorWriter apiErrorWriter,
+            @org.springframework.beans.factory.annotation.Value("${app.site.public-hosts:hostvero.net,www.hostvero.net}")
+            String publicHostNames,
             @Qualifier("hostveroCorsConfigurationSource") CorsConfigurationSource corsConfigurationSource) throws Exception {
+        java.util.Set<String> publicHosts = java.util.Arrays.stream(publicHostNames.split(","))
+                .map(String::trim).map(String::toLowerCase).filter(value -> !value.isBlank())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -128,7 +139,9 @@ public class SecurityConfig {
                         apiErrorWriter.write(response, HttpServletResponse.SC_UNAUTHORIZED, "AUTH_REQUIRED",
                                 "Please sign in to continue.", false)))
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
+                        .addHeaderWriter((request, response) -> response.setHeader("Content-Security-Policy",
+                                isPublicMarketingRequest(request, publicHosts)
+                                        ? MARKETING_CONTENT_SECURITY_POLICY : CONTENT_SECURITY_POLICY))
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                         .permissionsPolicyHeader(permissions -> permissions.policy(PERMISSIONS_POLICY))
                         .contentTypeOptions(Customizer.withDefaults())
@@ -139,6 +152,18 @@ public class SecurityConfig {
                 .addFilterBefore(bearerSessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource));
         return http.build();
+    }
+
+    private static boolean isPublicMarketingRequest(jakarta.servlet.http.HttpServletRequest request,
+            java.util.Set<String> publicHosts) {
+        if (!publicHosts.contains(request.getServerName().toLowerCase())) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        return "/".equals(path) || path.startsWith("/site/")
+                || java.util.Set.of("/for-hosts", "/for-guests", "/pricing", "/safety", "/contact",
+                        "/privacy", "/terms", "/host-agreement", "/robots.txt", "/sitemap.xml")
+                        .contains(path);
     }
 
     @Bean("hostveroCorsConfigurationSource")

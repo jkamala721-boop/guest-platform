@@ -42,6 +42,25 @@ class SecurityHardeningIntegrationTest {
     }
 
     @Test
+    void privateSurfacesAndApisKeepStrictCspWithoutGoogleOrigins() throws Exception {
+        for (String path : new String[]{"/index.html", "/admin/index.html"}) {
+            mockMvc.perform(get(path).header(HttpHeaders.HOST, "app.hostvero.net"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Security-Policy",
+                            org.hamcrest.Matchers.containsString("script-src 'self'")))
+                    .andExpect(header().string("Content-Security-Policy",
+                            org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("googletagmanager"))))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(
+                            org.hamcrest.Matchers.containsString("GTM-5349TBPM"))));
+        }
+
+        mockMvc.perform(get("/api/health").header(HttpHeaders.HOST, "hostvero.net"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy",
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("googletagmanager"))));
+    }
+
+    @Test
     void localCorsPolicyAllowsOnlyConfiguredLocalOriginWithoutCredentials() throws Exception {
         mockMvc.perform(options("/api/health")
                         .header(HttpHeaders.ORIGIN, "http://localhost:8080")

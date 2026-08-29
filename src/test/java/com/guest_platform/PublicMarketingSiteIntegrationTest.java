@@ -2,9 +2,11 @@ package com.guest_platform;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
@@ -52,8 +54,7 @@ class PublicMarketingSiteIntegrationTest {
                 "privacy", "terms", "host-agreement"}) {
             mvc.perform(get("/site/" + page + ".html")).andExpect(status().isOk())
                     .andExpect(content().string(containsString(
-                            "<head><!-- Google Tag Manager --><script>")))
-                    .andExpect(content().string(containsString("GTM-5349TBPM")))
+                            "<head><!-- Google Tag Manager --><script src=\"/site/gtm-loader.js\" defer>")))
                     .andExpect(content().string(containsString(
                             "<body><!-- Google Tag Manager (noscript) --><noscript><iframe")))
                     .andExpect(content().string(containsString(
@@ -64,6 +65,42 @@ class PublicMarketingSiteIntegrationTest {
                 .andExpect(content().string(not(containsString("GTM-5349TBPM"))));
         mvc.perform(get("/admin/index.html")).andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("GTM-5349TBPM"))));
+    }
+
+    @Test void marketingCspAllowsOnlyRequiredGtmAndGa4Origins() throws Exception {
+        for (String[] request : new String[][]{{"/", "hostvero.net"}, {"/for-hosts", "hostvero.net"},
+                {"/", "www.hostvero.net"}, {"/site/site.css", "hostvero.net"}}) {
+            mvc.perform(get(request[0]).header("Host", request[1]))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Security-Policy", containsString(
+                            "script-src 'self' https://www.googletagmanager.com")))
+                    .andExpect(header().string("Content-Security-Policy", containsString(
+                            "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com")))
+                    .andExpect(header().string("Content-Security-Policy", containsString(
+                            "img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com")))
+                    .andExpect(header().string("Content-Security-Policy", containsString(
+                            "frame-src https://www.googletagmanager.com")))
+                    .andExpect(header().string("Content-Security-Policy", not(containsString("unsafe-eval"))))
+                    .andExpect(header().string("Content-Security-Policy", not(containsString(
+                            "script-src 'self' 'unsafe-inline'"))))
+                    .andExpect(header().string("Content-Security-Policy", not(containsString("*.google"))))
+                    .andExpect(result -> assertEquals(1,
+                            result.getResponse().getHeaders("Content-Security-Policy").size()));
+        }
+
+        for (String[] request : new String[][]{{"/", "app.hostvero.net"}, {"/", "admin.hostvero.net"},
+                {"/api/health", "hostvero.net"}}) {
+            mvc.perform(get(request[0]).header("Host", request[1]))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Security-Policy", containsString("script-src 'self';")))
+                    .andExpect(header().string("Content-Security-Policy", not(containsString("googletagmanager"))))
+                    .andExpect(result -> assertEquals(1,
+                            result.getResponse().getHeaders("Content-Security-Policy").size()));
+        }
+
+        mvc.perform(get("/site/gtm-loader.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("GTM-5349TBPM")))
+                .andExpect(content().string(not(containsString("G-EMTK13GWYP"))));
     }
 
     @Test void publicAndLegalRoutesResolve() throws Exception {
