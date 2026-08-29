@@ -59,6 +59,9 @@ public class Booking {
     @Column(length = 2000)
     private String notes;
 
+    @Column(name = "checkout_reminder_message", length = 2000)
+    private String checkoutReminderMessage;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -153,6 +156,26 @@ public class Booking {
         }
         checkOutDate = newCheckOutDate;
         totalAmount = resultingTotalAmount;
+    }
+    public void setCheckoutReminderMessage(String checkoutReminderMessage) {
+        if (checkoutReminderMessage == null || checkoutReminderMessage.isBlank()) {
+            this.checkoutReminderMessage = null;
+            return;
+        }
+
+        String normalized = checkoutReminderMessage.trim();
+
+        if (normalized.length() > 2000) {
+            throw new IllegalArgumentException(
+                    "Checkout reminder message must not exceed 2000 characters"
+            );
+        }
+
+        this.checkoutReminderMessage = normalized;
+    }
+
+    public String getCheckoutReminderMessage() {
+        return checkoutReminderMessage;
     }
 
     public UUID getId() { return id; }

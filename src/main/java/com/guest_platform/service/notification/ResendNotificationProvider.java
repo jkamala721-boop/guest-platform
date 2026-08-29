@@ -140,13 +140,22 @@ public class ResendNotificationProvider implements NotificationProvider {
                     <p>Hostvero</p>
                     """.formatted(guestName);
 
-            case CHECKOUT_REMINDER -> """
-                    <p>Hello %s,</p>
-                    <p>This is a reminder that your Hostvero checkout is approaching.</p>
-                    <p>Please review your stay information before leaving the property.</p>
-                    <p>Hostvero</p>
-                    """.formatted(guestName);
+            case CHECKOUT_REMINDER -> {
+                String customMessage = notification.getBooking().getCheckoutReminderMessage();
 
+                String message = customMessage == null || customMessage.isBlank()
+                        ? "This is a reminder that your Hostvero checkout is approaching. Please review your stay information before leaving the property."
+                        : customMessage;
+
+                 yield """
+                          <p>Hello %s,</p>
+                          <p>%s</p>
+                          <p>Hostvero</p>
+                          """.formatted(
+                                  guestName,
+                                  escapeHtml(message).replace("\n", "<br>")
+                          );
+            }
             case MANUAL_MESSAGE -> """
                     <p>Hello %s,</p>
                     <p>%s</p>

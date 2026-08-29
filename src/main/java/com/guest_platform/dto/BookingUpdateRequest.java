@@ -20,5 +20,6 @@ public record BookingUpdateRequest(
         @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal totalAmount,
         @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
         @NotNull BookingStatus status,
-        @Size(max = 2000) String notes) {
+        @Size(max = 2000) String notes,
+        @Size(max = 2000) String checkoutReminderMessage) {
 }

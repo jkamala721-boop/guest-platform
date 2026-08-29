@@ -101,7 +101,8 @@ public class BookingService {
                 request.totalAmount(),
                 request.currency(),
                 status,
-                request.notes()
+                request.notes(),
+                request.checkoutReminderMessage()
         );
 
         Booking savedBooking = bookingRepository.save(booking);
@@ -132,8 +133,17 @@ public class BookingService {
         property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
         availabilityService.requireAvailableFor(request.status(), property.getId(), request.checkInDate(),
                 request.checkOutDate(), booking.getId());
-        apply(booking, property, request.checkInDate(), request.checkOutDate(), request.totalAmount(),
-                request.currency(), request.status(), request.notes());
+        apply(
+                booking,
+                property,
+                request.checkInDate(),
+                request.checkOutDate(),
+                request.totalAmount(),
+                request.currency(),
+                request.status(),
+                request.notes(),
+                request.checkoutReminderMessage()
+        );
         notificationService.reconcileBooking(booking.getId());
         return BookingResponse.from(booking);
     }
@@ -181,10 +191,21 @@ public class BookingService {
     }
 
     private void apply(Booking booking, Property property, java.time.LocalDate checkInDate,
-            java.time.LocalDate checkOutDate, java.math.BigDecimal totalAmount, String currency,
-            BookingStatus status, String notes) {
-        booking.update(property, checkInDate, checkOutDate, totalAmount,
-                currency.toUpperCase(Locale.ROOT), status, normalizeOptional(notes));
+        java.time.LocalDate checkOutDate, java.math.BigDecimal totalAmount, String currency,
+        BookingStatus status, String notes, String checkoutReminderMessage) {
+
+    booking.update(
+            property,
+            checkInDate,
+            checkOutDate,
+            totalAmount,
+            currency.toUpperCase(Locale.ROOT),
+            status,
+            normalizeOptional(notes)
+    );
+
+    booking.setCheckoutReminderMessage(checkoutReminderMessage);
+        
     }
 
     private String normalizeOptional(String value) {

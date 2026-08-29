@@ -1150,6 +1150,27 @@ async function renderBookingForm(existing = null) {
               >${value('notes')}</textarea>
 
             </div>
+            <div class="field full">
+
+              <label for="booking-checkout-reminder">
+                Checkout reminder message
+                <span class="muted">
+                  (optional)
+                </span>
+              </label>
+
+              <textarea
+                id="booking-checkout-reminder"
+                name="checkoutReminderMessage"
+                maxlength="2000"
+                placeholder="Example: Please remember to return the keys at reception before checkout."
+              >${value('checkoutReminderMessage')}</textarea>
+
+              <span class="help">
+                This message will be sent to the guest automatically one hour before checkout.
+              </span>
+
+            </div>
 
           </div>
 
@@ -3034,7 +3055,6 @@ async function renderPropertyForm(id) {
               placeholder="Quiet hours, visitors, smoking rules..."
             >${value('houseRules')}</textarea>
           </div>
-
 
           <div class="field">
             <label for="property-contact">
