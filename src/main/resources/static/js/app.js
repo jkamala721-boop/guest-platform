@@ -1019,6 +1019,34 @@ async function renderBookingForm(existing = null) {
 
             </div>
 
+            <div class="field">
+              <label for="booking-house-number">
+                House / Unit number
+                <span class="muted">(optional)</span>
+              </label>
+              <input
+                id="booking-house-number"
+                name="houseNumber"
+                maxlength="100"
+                placeholder="A12, Unit 4B, Villa 7"
+                value="${value('houseNumber')}"
+              >
+            </div>
+
+            <div class="field">
+              <label for="booking-block-name">
+                Block / Building section
+                <span class="muted">(optional)</span>
+              </label>
+              <input
+                id="booking-block-name"
+                name="blockName"
+                maxlength="100"
+                placeholder="Block B, Tower 2, West Wing"
+                value="${value('blockName')}"
+              >
+            </div>
+
             <div class="field full">
 
               <label>
@@ -1696,6 +1724,20 @@ async function renderBookingDetail(id) {
                 )}
               </strong>
             </div>
+
+            ${booking.houseNumber ? `
+              <div class="booking-detail-row">
+                <span>House / Unit number</span>
+                <strong>${escapeHtml(booking.houseNumber)}</strong>
+              </div>
+            ` : ''}
+
+            ${booking.blockName ? `
+              <div class="booking-detail-row">
+                <span>Block / Building section</span>
+                <strong>${escapeHtml(booking.blockName)}</strong>
+              </div>
+            ` : ''}
 
             <div class="booking-detail-row">
               <span>Amount</span>
@@ -5519,6 +5561,8 @@ function renderPrePaymentStayAccess(property) {
       <div class="public-info-list">
         <div class="public-info-row"><div><span>Check-in</span><strong>${escapeHtml(checkInTime)}</strong></div></div>
         <div class="public-info-row"><div><span>Check-out</span><strong>${escapeHtml(checkOutTime)}</strong></div></div>
+        ${property.houseNumber ? `<div class="public-info-row"><div><span>House / Unit number</span><strong>${escapeHtml(property.houseNumber)}</strong></div></div>` : ''}
+        ${property.blockName ? `<div class="public-info-row"><div><span>Block / Building section</span><strong>${escapeHtml(property.blockName)}</strong></div></div>` : ''}
         <div class="public-info-row"><div><span>Wi-Fi network</span><strong>${escapeHtml(property.wifiName || 'Ask your host')}</strong></div></div>
         <div class="public-info-row"><div><span>Wi-Fi password</span><strong>${escapeHtml(property.wifiPassword || 'Ask your host')}</strong></div></div>
         <div class="public-info-row"><div><span>Host contact</span><strong>${escapeHtml(property.contactPhone || 'Contact your host directly')}</strong></div></div>
@@ -5686,6 +5730,18 @@ function renderActiveStay(result, token) {
 
 
       <div class="public-info-list">
+
+        ${result.stay.houseNumber ? `
+          <div class="public-info-row">
+            <div><span>House / Unit number</span><strong>${escapeHtml(result.stay.houseNumber)}</strong></div>
+          </div>
+        ` : ''}
+
+        ${result.stay.blockName ? `
+          <div class="public-info-row">
+            <div><span>Block / Building section</span><strong>${escapeHtml(result.stay.blockName)}</strong></div>
+          </div>
+        ` : ''}
 
 
         <div class="public-info-row">

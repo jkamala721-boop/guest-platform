@@ -101,6 +101,8 @@ public class BookingService {
                 request.totalAmount(),
                 request.currency(),
                 status,
+                request.houseNumber(),
+                request.blockName(),
                 request.notes(),
                 request.checkoutReminderMessage()
         );
@@ -141,6 +143,8 @@ public class BookingService {
                 request.totalAmount(),
                 request.currency(),
                 request.status(),
+                request.houseNumber(),
+                request.blockName(),
                 request.notes(),
                 request.checkoutReminderMessage()
         );
@@ -192,7 +196,8 @@ public class BookingService {
 
     private void apply(Booking booking, Property property, java.time.LocalDate checkInDate,
         java.time.LocalDate checkOutDate, java.math.BigDecimal totalAmount, String currency,
-        BookingStatus status, String notes, String checkoutReminderMessage) {
+        BookingStatus status, String houseNumber, String blockName, String notes,
+        String checkoutReminderMessage) {
 
     booking.update(
             property,
@@ -205,6 +210,8 @@ public class BookingService {
     );
 
     booking.setCheckoutReminderMessage(checkoutReminderMessage);
+    booking.setHouseNumber(houseNumber);
+    booking.setBlockName(blockName);
         
     }
 

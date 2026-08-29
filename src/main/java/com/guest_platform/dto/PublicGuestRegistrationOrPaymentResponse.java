@@ -44,7 +44,8 @@ public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Ins
         var property = booking.getProperty();
         return new StayAccessDetails(property.getMapsUrl(), property.getCheckInTime(), property.getCheckOutTime(),
                 property.getCheckInInstructions(), property.getWifiName(), property.getWifiPassword(),
-                property.getHouseRules(), property.getContactPhone());
+                property.getHouseRules(), property.getContactPhone(), booking.getHouseNumber(),
+                booking.getBlockName());
     }
 
     public record PropertyPreview(String name, String location) {
@@ -59,6 +60,7 @@ public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Ins
 
     /** Present only when the host has explicitly granted pre-payment stay access. */
     public record StayAccessDetails(String mapsUrl, java.time.LocalTime checkInTime, java.time.LocalTime checkOutTime,
-            String checkInInstructions, String wifiName, String wifiPassword, String houseRules, String contactPhone) {
+            String checkInInstructions, String wifiName, String wifiPassword, String houseRules, String contactPhone,
+            String houseNumber, String blockName) {
     }
 }

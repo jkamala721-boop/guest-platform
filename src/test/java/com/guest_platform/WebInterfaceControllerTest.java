@@ -51,6 +51,19 @@ class WebInterfaceControllerTest {
     }
 
     @Test
+    void bookingCheckinLocationFieldsUseExistingFormsAndGuestSafeRendering() throws Exception {
+        mvc.perform(get("/js/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"houseNumber\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"blockName\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("maxlength=\"100\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("House / Unit number")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Block / Building section")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("result.stay.houseNumber")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("property.blockName")));
+    }
+
+    @Test
     void invalidPublicTokenUsesTheExistingSafeApiBehavior() throws Exception {
         mvc.perform(get("/api/public/guest/not-a-valid-token"))
                 .andExpect(status().isNotFound());

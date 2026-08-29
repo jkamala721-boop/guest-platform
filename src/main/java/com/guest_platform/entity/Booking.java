@@ -62,6 +62,12 @@ public class Booking {
     @Column(name = "checkout_reminder_message", length = 2000)
     private String checkoutReminderMessage;
 
+    @Column(name = "house_number", length = 100)
+    private String houseNumber;
+
+    @Column(name = "block_name", length = 100)
+    private String blockName;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -176,6 +182,33 @@ public class Booking {
 
     public String getCheckoutReminderMessage() {
         return checkoutReminderMessage;
+    }
+
+    public void setHouseNumber(String houseNumber) {
+        this.houseNumber = normalizeCheckinLocation(houseNumber, "House / Unit number");
+    }
+
+    public String getHouseNumber() {
+        return houseNumber;
+    }
+
+    public void setBlockName(String blockName) {
+        this.blockName = normalizeCheckinLocation(blockName, "Block / Building section");
+    }
+
+    public String getBlockName() {
+        return blockName;
+    }
+
+    private static String normalizeCheckinLocation(String value, String fieldLabel) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.length() > 100) {
+            throw new IllegalArgumentException(fieldLabel + " must not exceed 100 characters");
+        }
+        return normalized;
     }
 
     public UUID getId() { return id; }
