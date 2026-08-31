@@ -63,19 +63,20 @@ public class PaystackApiClient {
         }
         Long processorFeeMinor = data.path("fees").canConvertToLong() ? data.path("fees").longValue() : null;
         return new Verification(requiredText(data, "reference"), data.path("amount").longValue(),
-                requiredText(data, "currency"), requiredText(data, "id"), processorFeeMinor);
+                requiredText(data, "currency"), requiredText(data, "id"), processorFeeMinor,
+                optionalText(data, "channel"));
     }
 
-    public String createSubaccount(SubaccountRequest request) {
-        return subaccountCode(successfulData(send(SUBACCOUNT_URI, "POST", write(request)),
+    public Subaccount createSubaccount(SubaccountRequest request) {
+        return subaccount(successfulData(send(SUBACCOUNT_URI, "POST", write(request)),
                 "Unable to create Paystack payout destination"));
     }
 
-    public String updateSubaccount(String subaccountCode, SubaccountRequest request) {
+    public Subaccount updateSubaccount(String subaccountCode, SubaccountRequest request) {
         if (subaccountCode == null || subaccountCode.isBlank()) {
             throw new IllegalArgumentException("Paystack subaccount is required");
         }
-        return subaccountCode(successfulData(send(URI.create(SUBACCOUNT_UPDATE_URI
+        return subaccount(successfulData(send(URI.create(SUBACCOUNT_UPDATE_URI
                 + java.net.URLEncoder.encode(subaccountCode, java.nio.charset.StandardCharsets.UTF_8)), "PUT", write(request)),
                 "Unable to update Paystack payout destination"));
     }
@@ -196,8 +197,10 @@ public class PaystackApiClient {
         }
     }
 
-    private String subaccountCode(JsonNode data) {
-        return requiredText(data, "subaccount_code");
+    private Subaccount subaccount(JsonNode data) {
+        Long id = data.path("id").canConvertToLong() ? data.path("id").longValue() : null;
+        return new Subaccount(requiredText(data, "subaccount_code"), id, optionalText(data, "domain"),
+                data.path("active").asBoolean(true), data.path("is_verified").asBoolean(false));
     }
 
     private String recipientCode(JsonNode data) {
@@ -249,11 +252,14 @@ public class PaystackApiClient {
     }
 
     public record Verification(String reference, long amountMinor, String currency, String transactionId,
-            Long processorFeeMinor) {
+            Long processorFeeMinor, String channel) {
     }
 
     public record SubaccountRequest(String business_name, String bank_code, String account_number,
             java.math.BigDecimal percentage_charge, String description) {
+    }
+
+    public record Subaccount(String code, Long id, String domain, boolean active, boolean verified) {
     }
 
     public record TransferRecipientRequest(String type, String name, String account_number, String bank_code,

@@ -66,6 +66,9 @@ public class Payment {
     @Column(name = "hostvero_net_amount", precision = 12, scale = 2)
     private BigDecimal hostveroNetAmount;
 
+    @Column(name = "provider_channel", length = 40)
+    private String providerChannel;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payout_method", length = 30)
     private PayoutMethod payoutMethod;
@@ -184,6 +187,10 @@ public class Payment {
 
     /** Records provider-reported economics; the host payout is never reduced by processor fees. */
     public void recordPaystackSettlement(BigDecimal actualProcessorFee) {
+        recordPaystackSettlement(actualProcessorFee, null);
+    }
+
+    public void recordPaystackSettlement(BigDecimal actualProcessorFee, String channel) {
         if (provider != PaymentProvider.PAYSTACK || actualProcessorFee == null
                 || actualProcessorFee.signum() < 0) {
             throw new IllegalArgumentException("Invalid Paystack settlement accounting");
@@ -191,6 +198,7 @@ public class Payment {
         processorFee = actualProcessorFee;
         hostPayoutAmount = bookingAmount;
         hostveroNetAmount = serviceFee.subtract(actualProcessorFee);
+        providerChannel = channel == null || channel.isBlank() ? null : channel.trim().toLowerCase();
     }
 
     /** Snapshots the configured destination before the guest begins checkout. */
@@ -216,6 +224,7 @@ public class Payment {
     public BigDecimal getProcessorFee() { return processorFee; }
     public BigDecimal getHostPayoutAmount() { return hostPayoutAmount; }
     public BigDecimal getHostveroNetAmount() { return hostveroNetAmount; }
+    public String getProviderChannel() { return providerChannel; }
     public PayoutMethod getPayoutMethod() { return payoutMethod; }
     public String getPayoutDestinationReference() { return payoutDestinationReference; }
     public String getCurrency() { return currency; }

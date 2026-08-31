@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.guest_platform.repository.HostPayoutSettingsRepository;
+import com.guest_platform.repository.PaymentRepository;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -36,6 +37,7 @@ class HostPayoutSettingsIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private HostPayoutSettingsRepository payoutSettingsRepository;
+    @Autowired private PaymentRepository paymentRepository;
 
     @Test
     void hostCanManageOnlyOwnMaskedPayoutSettingsWithoutDuplicateSubaccounts() throws Exception {
@@ -52,6 +54,12 @@ class HostPayoutSettingsIntegrationTest {
         String initialSubaccount = payoutSettingsRepository.findAll().stream()
                 .filter(settings -> settings.getAccountName().equals("First Payout Account"))
                 .findFirst().orElseThrow().getPaystackSubaccountCode();
+        var initialSettings = payoutSettingsRepository.findAll().stream()
+                .filter(settings -> settings.getPaystackSubaccountCode().equals(initialSubaccount))
+                .findFirst().orElseThrow();
+        assertThat(initialSettings.getPaystackSubaccountDomain()).isEqualTo("mock");
+        assertThat(initialSettings.getPaystackSubaccountActive()).isTrue();
+        assertThat(initialSettings.getPaystackSubaccountVerified()).isTrue();
 
         mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(firstHost))
                         .contentType(MediaType.APPLICATION_JSON).content(settings("9876543210")))
@@ -64,6 +72,67 @@ class HostPayoutSettingsIntegrationTest {
 
         mockMvc.perform(get("/api/me/payout-settings").header("Authorization", bearer(secondHost)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(false));
+
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(secondHost))
+                        .contentType(MediaType.APPLICATION_JSON).content(settings("1111222233")))
+                .andExpect(status().isOk());
+        String secondSubaccount = payoutSettingsRepository.findAll().stream()
+                .filter(settings -> "****2233".equals("****" + settings.getAccountNumberLast4()))
+                .findFirst().orElseThrow().getPaystackSubaccountCode();
+        assertThat(secondSubaccount).isNotEqualTo(initialSubaccount);
+    }
+
+    @Test
+    void bookingOwnerDeterminesStoredSplitDestinationAndClientCannotOverrideIt() throws Exception {
+        String firstToken = register("split-owner-a@example.com", "Split Owner A");
+        String secondToken = register("split-owner-b@example.com", "Split Owner B");
+        configure(firstToken, "0123456789", "Owner A Account");
+        configure(secondToken, "9876543210", "Owner B Account");
+        String firstCode = payoutSettingsRepository.findAll().stream()
+                .filter(value -> "Owner A Account".equals(value.getAccountName())).findFirst().orElseThrow()
+                .getPaystackSubaccountCode();
+        String secondCode = payoutSettingsRepository.findAll().stream()
+                .filter(value -> "Owner B Account".equals(value.getAccountName())).findFirst().orElseThrow()
+                .getPaystackSubaccountCode();
+
+        String firstBooking = createBooking(firstToken, createProperty(firstToken), createGuest(firstToken),
+                new BigDecimal("10000.00"));
+        String secondBooking = createBooking(secondToken, createProperty(secondToken), createGuest(secondToken),
+                new BigDecimal("10000.00"));
+        JsonNode firstPayment = json(mockMvc.perform(post("/api/bookings/{bookingId}/payments", firstBooking)
+                        .header("Authorization", bearer(firstToken)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"PAYSTACK\",\"hostId\":\"00000000-0000-0000-0000-000000000000\","
+                                + "\"subaccount\":\"ACCT_ATTACKER\",\"transaction_charge\":1,\"amount\":1}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.bookingAmount").value(10000.00))
+                .andExpect(jsonPath("$.serviceFee").value(500.00))
+                .andExpect(jsonPath("$.chargedAmount").value(10500.00))
+                .andReturn());
+        JsonNode secondPayment = json(mockMvc.perform(post("/api/bookings/{bookingId}/payments", secondBooking)
+                        .header("Authorization", bearer(secondToken)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"PAYSTACK\",\"hostId\":\"00000000-0000-0000-0000-000000000000\","
+                                + "\"subaccount\":\"ACCT_ATTACKER\",\"transaction_charge\":999999,\"amount\":1}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.bookingAmount").value(10000.00))
+                .andExpect(jsonPath("$.serviceFee").value(500.00))
+                .andExpect(jsonPath("$.chargedAmount").value(10500.00))
+                .andReturn());
+
+        var persistedA = paymentRepository.findById(java.util.UUID.fromString(firstPayment.get("id").asText()))
+                .orElseThrow();
+        var persistedB = paymentRepository.findById(java.util.UUID.fromString(secondPayment.get("id").asText()))
+                .orElseThrow();
+        assertThat(persistedA.getPayoutDestinationReference()).isEqualTo(firstCode).isNotEqualTo(secondCode)
+                .isNotEqualTo("ACCT_ATTACKER");
+        assertThat(persistedB.getPayoutDestinationReference()).isEqualTo(secondCode).isNotEqualTo(firstCode)
+                .isNotEqualTo("ACCT_ATTACKER");
+        assertThat(persistedA.getBookingAmount()).isEqualByComparingTo("10000.00");
+        assertThat(persistedA.getServiceFee()).isEqualByComparingTo("500.00");
+        assertThat(persistedA.getAmount()).isEqualByComparingTo("10500.00");
+        assertThat(persistedB.getBookingAmount()).isEqualByComparingTo("10000.00");
+        assertThat(persistedB.getServiceFee()).isEqualByComparingTo("500.00");
+        assertThat(persistedB.getAmount()).isEqualByComparingTo("10500.00");
+        assertThat(firstCode).isNotEqualTo(secondCode);
     }
 
     @Test
@@ -76,7 +145,8 @@ class HostPayoutSettingsIntegrationTest {
         mockMvc.perform(post("/api/bookings/{bookingId}/payments", bookingId).header("Authorization", bearer(host))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"PAYSTACK\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("The host must configure payout settings before accepting Paystack payments"));
+                .andExpect(jsonPath("$.code").value("HOST_PAYOUT_ACCOUNT_NOT_READY"))
+                .andExpect(jsonPath("$.message").value("Host payout account is not ready for automatic settlement."));
     }
 
     @Test
@@ -117,6 +187,14 @@ class HostPayoutSettingsIntegrationTest {
                 "accountNumber", accountNumber, "accountName", "First Payout Account"));
     }
 
+    private void configure(String token, String accountNumber, String accountName) throws Exception {
+        mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
+                                "payoutMethod", "BANK_ACCOUNT", "settlementBankCode", "KEPSS-TEST",
+                                "accountNumber", accountNumber, "accountName", accountName))))
+                .andExpect(status().isOk());
+    }
+
     private String register(String email, String fullName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("email", email, "password", PASSWORD,
@@ -153,12 +231,16 @@ class HostPayoutSettingsIntegrationTest {
     }
 
     private String createBooking(String token, String propertyId, String guestId) throws Exception {
+        return createBooking(token, propertyId, guestId, new BigDecimal("3500.00"));
+    }
+
+    private String createBooking(String token, String propertyId, String guestId, BigDecimal amount) throws Exception {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("propertyId", propertyId);
         payload.put("guestId", guestId);
         payload.put("checkInDate", LocalDate.now().plusDays(220).toString());
         payload.put("checkOutDate", LocalDate.now().plusDays(222).toString());
-        payload.put("totalAmount", new BigDecimal("3500.00"));
+        payload.put("totalAmount", amount);
         payload.put("currency", "KES");
         payload.put("status", "PENDING_PAYMENT");
         MvcResult result = mockMvc.perform(post("/api/bookings").header("Authorization", bearer(token))

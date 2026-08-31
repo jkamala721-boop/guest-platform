@@ -49,6 +49,18 @@ public class HostPayoutSettings {
     @Column(name = "paystack_subaccount_code", unique = true, length = 100)
     private String paystackSubaccountCode;
 
+    @Column(name = "paystack_subaccount_id")
+    private Long paystackSubaccountId;
+
+    @Column(name = "paystack_subaccount_domain", length = 10)
+    private String paystackSubaccountDomain;
+
+    @Column(name = "paystack_subaccount_active")
+    private Boolean paystackSubaccountActive;
+
+    @Column(name = "paystack_subaccount_verified")
+    private Boolean paystackSubaccountVerified;
+
     @Column(name = "paystack_recipient_code", unique = true, length = 100)
     private String paystackRecipientCode;
 
@@ -100,6 +112,18 @@ public class HostPayoutSettings {
         this.status = PayoutSettingsStatus.CONFIGURED;
     }
 
+    public void recordPaystackSubaccount(String code, Long id, String domain, boolean active, boolean verified) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Paystack subaccount code is required");
+        }
+        this.paystackSubaccountCode = code;
+        this.paystackSubaccountId = id;
+        this.paystackSubaccountDomain = domain == null || domain.isBlank() ? null : domain.trim().toLowerCase();
+        this.paystackSubaccountActive = active;
+        this.paystackSubaccountVerified = verified;
+        this.status = active ? PayoutSettingsStatus.CONFIGURED : PayoutSettingsStatus.NEEDS_ATTENTION;
+    }
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -118,6 +142,10 @@ public class HostPayoutSettings {
     public String getAccountNumberLast4() { return accountNumberLast4; }
     public String getAccountName() { return accountName; }
     public String getPaystackSubaccountCode() { return paystackSubaccountCode; }
+    public Long getPaystackSubaccountId() { return paystackSubaccountId; }
+    public String getPaystackSubaccountDomain() { return paystackSubaccountDomain; }
+    public Boolean getPaystackSubaccountActive() { return paystackSubaccountActive; }
+    public Boolean getPaystackSubaccountVerified() { return paystackSubaccountVerified; }
     public String getPaystackRecipientCode() { return paystackRecipientCode; }
     public String getMpesaPhoneLast4() { return mpesaPhoneLast4; }
     public String getMpesaPhoneFingerprint() { return mpesaPhoneFingerprint; }

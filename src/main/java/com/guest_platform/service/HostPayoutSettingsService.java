@@ -12,7 +12,7 @@ import com.guest_platform.entity.Host;
 import com.guest_platform.entity.HostPayoutSettings;
 import com.guest_platform.entity.PayoutMethod;
 import com.guest_platform.entity.PayoutSettingsStatus;
-import com.guest_platform.exception.ConflictException;
+import com.guest_platform.exception.LifecycleConflictException;
 import com.guest_platform.exception.ResourceNotFoundException;
 import com.guest_platform.repository.HostPayoutSettingsRepository;
 import com.guest_platform.repository.HostRepository;
@@ -65,12 +65,16 @@ public class HostPayoutSettingsService {
     public PaystackPayoutDestination requireConfiguredPaystackDestination(UUID hostId) {
         HostPayoutSettings settings = payoutSettingsRepository.findByHostId(hostId)
                 .filter(value -> value.getStatus() == PayoutSettingsStatus.CONFIGURED)
-                .orElseThrow(() -> new ConflictException(
-                        "The host must configure payout settings before accepting Paystack payments"));
+                .orElseThrow(this::automaticSettlementNotReady);
         String destinationReference = settings.getPayoutMethod() == PayoutMethod.BANK_ACCOUNT
                 ? settings.getPaystackSubaccountCode() : settings.getPaystackRecipientCode();
         if (destinationReference == null || destinationReference.isBlank()) {
-            throw new ConflictException("The host must configure payout settings before accepting Paystack payments");
+            throw automaticSettlementNotReady();
+        }
+        if (settings.getPayoutMethod() == PayoutMethod.BANK_ACCOUNT
+                && (Boolean.FALSE.equals(settings.getPaystackSubaccountActive())
+                        || !paystackSubaccountService.isCompatibleWithConfiguredCredentials(settings))) {
+            throw automaticSettlementNotReady();
         }
         return new PaystackPayoutDestination(settings.getPayoutMethod(), destinationReference);
     }
@@ -80,15 +84,20 @@ public class HostPayoutSettingsService {
         String bankCode = request.settlementBankCode().trim();
         bankDirectoryService.requireSupportedBank(bankCode);
         String accountNumber = request.accountNumber().trim();
-        String subaccountCode = paystackSubaccountService.createOrUpdate(host, existing, request);
+        var subaccount = paystackSubaccountService.createOrUpdate(host, existing, request);
+        HostPayoutSettings settings;
         if (existing == null) {
-            return new HostPayoutSettings(host, PayoutMethod.BANK_ACCOUNT, bankCode,
-                    accountNumber.substring(accountNumber.length() - 4), request.accountName().trim(), subaccountCode,
+            settings = new HostPayoutSettings(host, PayoutMethod.BANK_ACCOUNT, bankCode,
+                    accountNumber.substring(accountNumber.length() - 4), request.accountName().trim(), subaccount.code(),
                     null, null, null);
+        } else {
+            existing.update(PayoutMethod.BANK_ACCOUNT, bankCode, accountNumber.substring(accountNumber.length() - 4),
+                    request.accountName().trim(), subaccount.code(), null, null, null);
+            settings = existing;
         }
-        existing.update(PayoutMethod.BANK_ACCOUNT, bankCode, accountNumber.substring(accountNumber.length() - 4),
-                request.accountName().trim(), subaccountCode, null, null, null);
-        return existing;
+        settings.recordPaystackSubaccount(subaccount.code(), subaccount.id(), subaccount.domain(),
+                subaccount.active(), subaccount.verified());
+        return settings;
     }
 
     private HostPayoutSettings saveMpesa(Host host, HostPayoutSettings existing,
@@ -125,5 +134,10 @@ public class HostPayoutSettingsService {
     private Host activeHost(UUID hostId) {
         return hostRepository.findById(hostId).filter(Host::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Host account was not found"));
+    }
+
+    private LifecycleConflictException automaticSettlementNotReady() {
+        return new LifecycleConflictException("HOST_PAYOUT_ACCOUNT_NOT_READY",
+                "Host payout account is not ready for automatic settlement.");
     }
 }

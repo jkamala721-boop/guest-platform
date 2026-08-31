@@ -1,7 +1,6 @@
 package com.guest_platform.service;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,10 +27,13 @@ public class PaystackSubaccountService {
         this.paystackApiClient = paystackApiClient;
     }
 
-    public String createOrUpdate(Host host, HostPayoutSettings existing, HostPayoutSettingsUpsertRequest request) {
+    public PaystackApiClient.Subaccount createOrUpdate(Host host, HostPayoutSettings existing,
+            HostPayoutSettingsUpsertRequest request) {
         if ("mock".equalsIgnoreCase(mode)) {
-            return existing == null || existing.getPaystackSubaccountCode() == null
-                    ? "ACCT_MOCK_" + UUID.randomUUID() : existing.getPaystackSubaccountCode();
+            String code = existing == null || existing.getPaystackSubaccountCode() == null
+                    ? "ACCT_MOCK_" + host.getId() : existing.getPaystackSubaccountCode();
+            return new PaystackApiClient.Subaccount(code, existing == null ? null : existing.getPaystackSubaccountId(),
+                    "mock", true, true);
         }
         if (!"live".equalsIgnoreCase(mode)) {
             throw new IllegalStateException("Paystack payment mode is invalid");
@@ -45,5 +47,22 @@ public class PaystackSubaccountService {
         return existing == null || existing.getPaystackSubaccountCode() == null
                 ? paystackApiClient.createSubaccount(payload)
                 : paystackApiClient.updateSubaccount(existing.getPaystackSubaccountCode(), payload);
+    }
+
+    public boolean isCompatibleWithConfiguredCredentials(HostPayoutSettings settings) {
+        String domain = settings.getPaystackSubaccountDomain();
+        if (domain == null || domain.isBlank()) {
+            return false;
+        }
+        if ("mock".equalsIgnoreCase(mode)) {
+            return "mock".equalsIgnoreCase(domain);
+        }
+        if (secretKey.startsWith("sk_test_")) {
+            return "test".equalsIgnoreCase(domain);
+        }
+        if (secretKey.startsWith("sk_live_")) {
+            return "live".equalsIgnoreCase(domain);
+        }
+        return false;
     }
 }

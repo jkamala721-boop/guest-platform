@@ -205,7 +205,7 @@ public class PaymentService {
         }
         verifyPaystackAmount(payment, request.amountMinor(), request.currency());
         if (request.processorFeeMinor() != null) {
-            payment.recordPaystackSettlement(fromMinorUnits(request.processorFeeMinor()));
+            payment.recordPaystackSettlement(fromMinorUnits(request.processorFeeMinor()), request.channel());
         }
         completeVerifiedPayment(payment, requireValue(request.eventId(), "eventId"));
         return PaymentResponse.from(payment);
@@ -375,7 +375,7 @@ public class PaymentService {
     }
 
     public record PaystackWebhookPayment(UUID paymentId, UUID bookingId, String providerReference, String eventId,
-            Long amountMinor, String currency, Long processorFeeMinor) {
+            Long amountMinor, String currency, Long processorFeeMinor, String channel) {
     }
 
     private record PaymentAmounts(BigDecimal bookingAmount, BigDecimal serviceFee, BigDecimal chargedAmount) {

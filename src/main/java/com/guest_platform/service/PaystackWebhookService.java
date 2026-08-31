@@ -60,6 +60,7 @@ public class PaystackWebhookService {
         long amountMinor = requiredLong(data, "amount");
         String currency = requiredText(data, "currency");
         Long processorFeeMinor = optionalLong(data, "fees");
+        String channel = optionalText(data, "channel");
         if (!"success".equalsIgnoreCase(requiredText(data, "status"))) {
             return;
         }
@@ -71,6 +72,7 @@ public class PaystackWebhookService {
                 throw new ConflictException("Paystack transaction did not match the booking");
             }
             processorFeeMinor = verified.processorFeeMinor();
+            channel = verified.channel();
         } else if (!"mock".equalsIgnoreCase(mode)) {
             throw new WebhookAuthenticationException();
         }
@@ -78,7 +80,7 @@ public class PaystackWebhookService {
         JsonNode metadata = metadata(data);
         paymentService.processVerifiedPaystackWebhook(new PaymentService.PaystackWebhookPayment(
                 uuid(metadata, "paymentId"), uuid(metadata, "bookingId"), reference,
-                "PAYSTACK-" + requiredText(data, "id"), amountMinor, currency, processorFeeMinor));
+                "PAYSTACK-" + requiredText(data, "id"), amountMinor, currency, processorFeeMinor, channel));
     }
 
     private void verifySignature(String signature, String payload) {

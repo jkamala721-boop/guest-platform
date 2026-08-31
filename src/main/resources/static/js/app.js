@@ -1525,6 +1525,13 @@ async function renderBookingDetail(id) {
                 payment.currency
               )}
             </span>
+            ${payment.provider === 'PAYSTACK' ? `
+              <span>Booking amount: ${formatMoney(payment.bookingAmount, payment.currency)}</span>
+              <span>Hostvero guest fee (5%): ${formatMoney(payment.serviceFee, payment.currency)}</span>
+              <span>Paystack processing fee: ${payment.processorFee == null ? 'Pending provider confirmation' : formatMoney(payment.processorFee, payment.currency)}</span>
+              <span>Host settlement: ${payment.hostPayoutAmount == null ? formatMoney(payment.bookingAmount, payment.currency) : formatMoney(payment.hostPayoutAmount, payment.currency)}</span>
+              <span>Hostvero net: ${payment.hostveroNetAmount == null ? 'Pending provider confirmation' : formatMoney(payment.hostveroNetAmount, payment.currency)}</span>
+            ` : ''}
           </div>
 
           ${badge(payment.status)}
