@@ -97,6 +97,9 @@ class PaystackIntegrationTest {
                 .andExpect(status().isNoContent());
         assertThat(hostNotificationRepository.countByBookingIdAndType(java.util.UUID.fromString(bookingId),
                 HostNotificationType.PAYMENT_CONFIRMED)).isEqualTo(1);
+        assertThat(hostPayoutRepository.findByPaymentId(java.util.UUID.fromString(payment.get("id").asText())))
+                .as("automatic bank split settlement must never enter the manual/transfer payout ledger")
+                .isEmpty();
         mockMvc.perform(get("/api/payments/{paymentId}", payment.get("id").asText())
                         .header("Authorization", bearer(hostToken)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUCCEEDED"));
@@ -126,6 +129,8 @@ class PaystackIntegrationTest {
         mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(wrongAmount))
                         .contentType(MediaType.APPLICATION_JSON).content(wrongAmount))
                 .andExpect(status().isConflict());
+        assertThat(hostPayoutRepository.findByPaymentId(java.util.UUID.fromString(mismatchPayment.get("id").asText())))
+                .isEmpty();
         String wrongCurrency = successPayload(mismatchPayment, mismatchBookingId, 367500L, "USD", 1003L);
         mockMvc.perform(post("/api/webhooks/paystack").header("x-paystack-signature", paystackSignature(wrongCurrency))
                         .contentType(MediaType.APPLICATION_JSON).content(wrongCurrency))

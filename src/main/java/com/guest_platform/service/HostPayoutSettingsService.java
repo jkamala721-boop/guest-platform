@@ -2,6 +2,7 @@ package com.guest_platform.service;
 
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +59,12 @@ public class HostPayoutSettingsService {
         HostPayoutSettings existing = payoutSettingsRepository.findByHostId(hostId).orElse(null);
         HostPayoutSettings settings = request.payoutMethod() == PayoutMethod.BANK_ACCOUNT
                 ? saveBank(host, existing, request) : saveMpesa(host, existing, request);
-        return HostPayoutSettingsResponse.from(payoutSettingsRepository.save(settings));
+        try {
+            return HostPayoutSettingsResponse.from(payoutSettingsRepository.saveAndFlush(settings));
+        } catch (DataIntegrityViolationException exception) {
+            throw new LifecycleConflictException("HOST_PAYOUT_CONFIGURATION_CONFLICT",
+                    "Host payout account could not be configured. Re-enter the destination and try again.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -84,7 +90,14 @@ public class HostPayoutSettingsService {
         String bankCode = request.settlementBankCode().trim();
         bankDirectoryService.requireSupportedBank(bankCode);
         String accountNumber = request.accountNumber().trim();
-        var subaccount = paystackSubaccountService.createOrUpdate(host, existing, request);
+        final com.guest_platform.service.payment.PaystackApiClient.Subaccount subaccount;
+        try {
+            subaccount = paystackSubaccountService.createOrUpdate(host, existing, request);
+        } catch (com.guest_platform.service.payment.PaystackApiClient.PaystackRequestRejectedException
+                | IllegalStateException exception) {
+            throw new LifecycleConflictException("HOST_PAYOUT_CONFIGURATION_FAILED",
+                    "Host payout account could not be configured. Check the details and try again.");
+        }
         HostPayoutSettings settings;
         if (existing == null) {
             settings = new HostPayoutSettings(host, PayoutMethod.BANK_ACCOUNT, bankCode,
@@ -114,6 +127,7 @@ public class HostPayoutSettingsService {
                     recipientCode, last4, fingerprint);
         }
         existing.update(PayoutMethod.MPESA, null, null, null, null, recipientCode, last4, fingerprint);
+        existing.clearPaystackSubaccount();
         return existing;
     }
 

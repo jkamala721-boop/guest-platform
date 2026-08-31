@@ -21,7 +21,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.guest_platform.entity.HostPayoutSettings;
+import com.guest_platform.entity.PayoutMethod;
 import com.guest_platform.repository.HostPayoutSettingsRepository;
+import com.guest_platform.repository.HostRepository;
 import com.guest_platform.repository.PaymentRepository;
 
 import tools.jackson.databind.JsonNode;
@@ -37,6 +40,7 @@ class HostPayoutSettingsIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private HostPayoutSettingsRepository payoutSettingsRepository;
+    @Autowired private HostRepository hostRepository;
     @Autowired private PaymentRepository paymentRepository;
 
     @Test
@@ -180,6 +184,24 @@ class HostPayoutSettingsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
                                 "payoutMethod", "MPESA", "mpesaPhone", "123"))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sameProviderRecipientMayRepresentTheSameLegitimateDestinationForDifferentHosts() throws Exception {
+        register("shared-recipient-a@example.com", "Shared Recipient A");
+        register("shared-recipient-b@example.com", "Shared Recipient B");
+        var first = hostRepository.findByEmailIgnoreCase("shared-recipient-a@example.com").orElseThrow();
+        var second = hostRepository.findByEmailIgnoreCase("shared-recipient-b@example.com").orElseThrow();
+        String sharedProviderRecipient = "RCP_SHARED_PROVIDER_DESTINATION";
+
+        payoutSettingsRepository.saveAndFlush(new HostPayoutSettings(first, PayoutMethod.MPESA, null, null, null,
+                null, sharedProviderRecipient, "5678", "a".repeat(64)));
+        payoutSettingsRepository.saveAndFlush(new HostPayoutSettings(second, PayoutMethod.MPESA, null, null, null,
+                null, sharedProviderRecipient, "5678", "a".repeat(64)));
+
+        assertThat(payoutSettingsRepository.findAll().stream()
+                .filter(value -> sharedProviderRecipient.equals(value.getPaystackRecipientCode())))
+                .hasSize(2);
     }
 
     private String settings(String accountNumber) throws Exception {

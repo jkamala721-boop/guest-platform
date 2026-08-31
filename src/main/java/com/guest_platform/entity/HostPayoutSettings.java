@@ -61,7 +61,7 @@ public class HostPayoutSettings {
     @Column(name = "paystack_subaccount_verified")
     private Boolean paystackSubaccountVerified;
 
-    @Column(name = "paystack_recipient_code", unique = true, length = 100)
+    @Column(name = "paystack_recipient_code", length = 100)
     private String paystackRecipientCode;
 
     @Column(name = "mpesa_phone_last4", length = 4)
@@ -122,6 +122,14 @@ public class HostPayoutSettings {
         this.paystackSubaccountActive = active;
         this.paystackSubaccountVerified = verified;
         this.status = active ? PayoutSettingsStatus.CONFIGURED : PayoutSettingsStatus.NEEDS_ATTENTION;
+    }
+
+    public void clearPaystackSubaccount() {
+        this.paystackSubaccountCode = null;
+        this.paystackSubaccountId = null;
+        this.paystackSubaccountDomain = null;
+        this.paystackSubaccountActive = null;
+        this.paystackSubaccountVerified = null;
     }
 
     @PrePersist

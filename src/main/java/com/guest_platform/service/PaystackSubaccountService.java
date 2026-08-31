@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import com.guest_platform.dto.HostPayoutSettingsUpsertRequest;
 import com.guest_platform.entity.Host;
 import com.guest_platform.entity.HostPayoutSettings;
+import com.guest_platform.entity.PayoutMethod;
 import com.guest_platform.service.payment.PaystackApiClient;
 
 /** Isolates Paystack subaccount provisioning from host settings and payment completion. */
@@ -30,8 +31,7 @@ public class PaystackSubaccountService {
     public PaystackApiClient.Subaccount createOrUpdate(Host host, HostPayoutSettings existing,
             HostPayoutSettingsUpsertRequest request) {
         if ("mock".equalsIgnoreCase(mode)) {
-            String code = existing == null || existing.getPaystackSubaccountCode() == null
-                    ? "ACCT_MOCK_" + host.getId() : existing.getPaystackSubaccountCode();
+            String code = canReuseMock(existing) ? existing.getPaystackSubaccountCode() : "ACCT_MOCK_" + host.getId();
             return new PaystackApiClient.Subaccount(code, existing == null ? null : existing.getPaystackSubaccountId(),
                     "mock", true, true);
         }
@@ -44,9 +44,47 @@ public class PaystackSubaccountService {
         PaystackApiClient.SubaccountRequest payload = new PaystackApiClient.SubaccountRequest(
                 host.getFullName(), request.settlementBankCode().trim(), request.accountNumber().trim(),
                 NEUTRAL_PERCENTAGE_CHARGE, "Hostvero host payout destination");
-        return existing == null || existing.getPaystackSubaccountCode() == null
-                ? paystackApiClient.createSubaccount(payload)
-                : paystackApiClient.updateSubaccount(existing.getPaystackSubaccountCode(), payload);
+        String reusableCode = reconcileExistingCode(existing);
+        return reusableCode == null ? paystackApiClient.createSubaccount(payload)
+                : paystackApiClient.updateSubaccount(reusableCode, payload);
+    }
+
+    private String reconcileExistingCode(HostPayoutSettings existing) {
+        if (existing == null || existing.getPayoutMethod() != PayoutMethod.BANK_ACCOUNT
+                || existing.getPaystackSubaccountCode() == null || existing.getPaystackSubaccountCode().isBlank()) {
+            return null;
+        }
+        if (!existing.getPaystackSubaccountCode().startsWith("ACCT_")
+                || existing.getPaystackSubaccountCode().startsWith("ACCT_MOCK_")) {
+            return null;
+        }
+        String storedDomain = existing.getPaystackSubaccountDomain();
+        if (storedDomain != null && !storedDomain.isBlank() && !isCompatibleWithConfiguredCredentials(existing)) {
+            return null;
+        }
+        try {
+            PaystackApiClient.Subaccount fetched = paystackApiClient.fetchSubaccount(existing.getPaystackSubaccountCode());
+            return existing.getPaystackSubaccountCode().equals(fetched.code()) && domainMatchesCredentials(fetched.domain())
+                    ? fetched.code() : null;
+        } catch (PaystackApiClient.PaystackRequestRejectedException exception) {
+            if (exception.getStatusCode() == 404) {
+                return null;
+            }
+            throw exception;
+        }
+    }
+
+    private boolean canReuseMock(HostPayoutSettings existing) {
+        return existing != null && existing.getPayoutMethod() == PayoutMethod.BANK_ACCOUNT
+                && existing.getPaystackSubaccountCode() != null && !existing.getPaystackSubaccountCode().isBlank()
+                && "mock".equalsIgnoreCase(existing.getPaystackSubaccountDomain());
+    }
+
+    private boolean domainMatchesCredentials(String domain) {
+        if (domain == null || domain.isBlank()) return false;
+        if (secretKey.startsWith("sk_test_")) return "test".equalsIgnoreCase(domain);
+        if (secretKey.startsWith("sk_live_")) return "live".equalsIgnoreCase(domain);
+        return false;
     }
 
     public boolean isCompatibleWithConfiguredCredentials(HostPayoutSettings settings) {

@@ -81,6 +81,15 @@ public class PaystackApiClient {
                 "Unable to update Paystack payout destination"));
     }
 
+    public Subaccount fetchSubaccount(String subaccountCode) {
+        if (subaccountCode == null || subaccountCode.isBlank()) {
+            throw new IllegalArgumentException("Paystack subaccount is required");
+        }
+        return subaccount(successfulData(send(URI.create(SUBACCOUNT_UPDATE_URI
+                + java.net.URLEncoder.encode(subaccountCode, java.nio.charset.StandardCharsets.UTF_8)), "GET", null),
+                "Unable to fetch Paystack payout destination"));
+    }
+
     public String createTransferRecipient(TransferRecipientRequest request) {
         return recipientCode(successfulData(send(TRANSFER_RECIPIENT_URI, "POST", write(request)),
                 "Unable to create Paystack M-Pesa payout destination"));
