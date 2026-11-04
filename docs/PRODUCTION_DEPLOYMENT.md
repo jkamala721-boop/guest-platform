@@ -1,126 +1,391 @@
-# Hostvero production deployment (Render + Supabase)
+# Production Deployment Guide
 
-## Architecture
+## 1. Purpose
 
-Render runs the Java 21 Hostvero container. Render terminates HTTPS and forwards requests to Spring Boot; Spring
-honours forwarded headers. The service connects to Supabase PostgreSQL over SSL and Flyway applies pending migrations
-before the application becomes healthy. The Render health check calls `GET /api/health`.
+This document defines the standards and procedures for deploying Hostvero to production.
 
-Render does not currently provide a native JVM runtime, so this repository uses the minimal Java 21 `Dockerfile`.
-The image build command is `./mvnw -B -DskipTests package`; its start command is:
+It is intended to reduce deployment risk, protect production data, and ensure that releases are tested and verifiable.
 
-```sh
-exec java ${JAVA_OPTS:-} -jar /app/app.jar --server.port=${PORT:-8080}
-```
+**Important:** This document describes the required deployment process. It does not confirm the current production infrastructure, configuration, or deployment settings.
 
-Do not set a separate Render build or start command for this Docker service. Render builds the repository `Dockerfile`.
+Before executing a deployment, inspect the actual repository, hosting configuration, environment variables, database configuration, and deployment pipeline.
 
-## Render setup checklist
+Never guess production settings.
 
-1. Create a Render **Web Service** from the Hostvero GitHub repository and select the `docker` runtime.
-2. Use the production branch and either create from `render.yaml` or configure the matching variables below.
-3. Set `SPRING_PROFILES_ACTIVE=prod`; the image also defaults to this profile.
-4. Configure the Supabase JDBC URL, username, and password in Render's secret store.
-5. Set `HOSTVERO_PUBLIC_BASE_URL=https://app.hostvero.net`. Do not use localhost or the old Render domain for public links.
-6. Configure Resend variables before deployment. Production scheduled notifications use `EMAIL`.
-7. For Kenya production payments, set `PAYSTACK_PAYMENT_MODE=live` and configure the Paystack secret key. Keep
-   `STRIPE_PAYMENT_MODE=mock`, `MPESA_PAYMENT_MODE=mock`, and `WHATSAPP_ENABLED=false` unless those providers are
-   explicitly enabled.
-8. Deploy. Confirm Flyway completed, then confirm `GET /api/health` responds with HTTP 200.
-9. Verify host registration/login, an authenticated host request, and a secure guest link.
-10. Inspect Render logs for normal startup, without credentials, bearer tokens, guest tokens, or OTP values.
+## 2. Approved Technology
 
-## Render environment variables
+Hostvero's approved application stack includes:
 
-| Variable | Required in Phase 10A | Notes |
-| --- | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | Yes | `prod` |
-| `SUPABASE_DB_JDBC_URL` | Yes | PostgreSQL JDBC URL with `sslmode=require`; use the direct endpoint when Render can reach it, otherwise the Supavisor **session** pooler endpoint. Do not use the transaction pooler for this persistent Hibernate service. |
-| `SUPABASE_DB_USERNAME` | Yes | Supabase database role/user from the Connect panel. |
-| `SUPABASE_DB_PASSWORD` | Yes | Secret. |
-| `HOSTVERO_PUBLIC_BASE_URL` | Yes | Final non-localhost HTTPS origin; used for payment and secure guest links. |
-| `DB_POOL_MAX_SIZE`, `DB_POOL_MIN_IDLE`, `DB_CONNECTION_TIMEOUT_MS` | Recommended | Start with `5`, `1`, and `10000`; stay within the Supabase connection limit. |
-| `AUTH_SESSION_TTL_HOURS` | Optional | Defaults to 24. |
-| `RESEND_ENABLED` | Yes | `true` in production. |
-| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Yes | Resend secret and verified sender. The property name is `RESEND_FROM_EMAIL`. |
-| `NOTIFICATION_DEFAULT_CHANNEL` | Yes | `EMAIL`. |
-| `STRIPE_PAYMENT_MODE` | Yes | Keep `mock` in Phase 10A. If changed to `live`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` become mandatory. |
-| `PAYSTACK_PAYMENT_MODE` | Yes for Kenya production | Set `live` to use Paystack-hosted M-Pesa/card checkout; otherwise keep `mock`. |
-| `PAYSTACK_SECRET_KEY` | Required when Paystack is live | Secret server-side key. Never expose it in JavaScript or logs. |
-| `HOSTVERO_PAYOUT_FINGERPRINT_SECRET` | Yes | Separate secret used only to protect saved payout-destination fingerprints. |
-| `PAYSTACK_PUBLIC_KEY` | Optional | Reserved for a future Paystack client integration; the current hosted-checkout flow does not use it. |
-| `MPESA_PAYMENT_MODE` | Yes | Keep `mock`; real Daraja is intentionally not part of this pass. |
-| `MPESA_WEBHOOK_SECRET` | Optional while M-Pesa is mock | Reserve for the future provider implementation. |
-| `WHATSAPP_ENABLED` | Yes | `false` in Phase 10A. When enabled later, all `WHATSAPP_*` credentials and approved template names are required. |
+- Java 21.
+- Spring Boot.
+- Maven.
+- Spring Data JPA.
+- Hibernate.
+- Spring Security.
+- PostgreSQL.
+- Flyway.
+- HTML, CSS, and JavaScript.
 
-When WhatsApp is eventually enabled, configure `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
-`WHATSAPP_API_VERSION`, `WHATSAPP_MANUAL_TEMPLATE_NAME`, `WHATSAPP_GUEST_LINK_TEMPLATE_NAME`,
-`WHATSAPP_SCHEDULED_TEMPLATE_NAME`, and optionally `WHATSAPP_LANGUAGE_CODE`. Do not add those values while the
-integration is disabled.
+The current infrastructure and hosting providers must be verified from the actual deployment configuration.
 
-## Migrations and deploy safety
+Do not replace existing infrastructure or introduce new deployment platforms without explicit approval.
 
-- Flyway runs during application startup, before Render observes a healthy application.
-- V1--V19 are immutable. Every later schema change receives a new versioned migration; never edit an applied file.
-- Flyway validates applied migrations and has `clean` disabled in production.
-- A migration failure fails the new deploy; Render keeps the last successful deployment running. Investigate the
-  Flyway error and `flyway_schema_history` before retrying.
-- Application rollback restores a previous application image only. It does **not** undo a successful database migration.
-  Do not edit old migrations or invent destructive down-migrations. Use a new corrective migration or restore into a
-  safe environment after an approved recovery decision.
+## 3. Environments
 
-## Backups and recovery
+Development, testing, staging, and production environments should be clearly separated where available.
 
-Supabase owns database backups. Before a significant migration, confirm the project plan's backup/PITR capability and
-verify a recent backup under **Supabase Dashboard → Database → Backups**. Free-tier projects should also maintain an
-encrypted, access-controlled logical export on an approved schedule.
+### Development
 
-For recovery, first restore into a separate safe project/environment and validate schema, Flyway history, application
-startup, and a representative set of records. Do not test a restore by overwriting production. Record the target time,
-approval, and the required post-restore credential rotation before any production recovery.
+Used for:
 
-## Operational checks
+- Local development.
+- Feature implementation.
+- Debugging.
+- Initial testing.
 
-- Render: check deploy and runtime logs, `GET /api/health`, and configured health-check status.
-- Supabase: check connection utilisation and `flyway_schema_history`; use the Connect panel rather than copying
-  credentials into source files.
-- Providers: verify only configured providers. A disabled provider must have no credentials and make no network calls.
+Development must not depend on production data or production secrets unnecessarily.
 
-## Paystack hosted checkout
+### Testing
 
-Hostvero initializes Paystack transactions from the backend and redirects guests to Paystack's hosted checkout. The
-guest is charged the booking amount plus a server-calculated 5% Hostvero service fee; cash payments never receive that
-fee. Flyway V17 stores the booking amount and fee separately from the charged payment amount for auditability. Flyway
-V18 adds host payout destinations and provider-fee/settlement accounting for Paystack subaccount payments.
+Used for:
 
-Configure the Paystack Dashboard webhook URL as:
+- Automated tests.
+- Integration tests.
+- Regression testing.
+- Database migration testing.
+- Security testing.
 
-```text
-https://app.hostvero.net/api/webhooks/paystack
-```
+Test environments must use appropriate test data and isolated credentials.
 
-Paystack's `x-paystack-signature` is validated against `PAYSTACK_SECRET_KEY`. In live mode, Hostvero additionally
-calls Paystack's server-side transaction verification endpoint before the shared payment-completion flow runs. A
-browser callback only returns the guest to the secure link; it never confirms the booking.
+### Staging
 
-### Host payout destinations
+Where available, staging should closely resemble production.
 
-For a Kenyan **bank account**, Hostvero obtains the supported-bank list from Paystack and creates a Paystack
-subaccount. The checkout split assigns the booking amount to that subaccount and keeps Paystack processing fees on the
-main Hostvero account.
+Use it to verify:
 
-For an individual **M-Pesa** destination, Paystack uses a distinct `mobile_money` transfer-recipient model with the
-`MPESA` code; it is not a subaccount settlement destination. Hostvero creates the recipient when the host saves the
-destination, stores only a keyed fingerprint and masked final four digits, then creates one independent `PENDING`
-payout record after a verified guest payment. It does not initiate a transfer within the payment webhook because
-Paystack transfer balance/settlement availability must be reconciled independently. A failed or delayed host payout
-therefore never reverses an already verified guest payment, booking, receipt, or guest link.
+- Application startup.
+- Database connectivity.
+- Migration behavior.
+- Authentication.
+- Booking workflows.
+- Payment integration.
+- Guest links.
+- Email integration.
+- Frontend behavior.
 
-### M-Pesa payout reconciliation
+### Production
 
-For M-Pesa destinations, configure Paystack Transfers for the platform account and retain the standard signed Paystack
-webhook URL. Hostvero waits for `HOST_PAYOUT_SETTLEMENT_HOLD_MINUTES` (24 hours by default), checks the available KES
-balance, and then submits a single transfer using the payout's durable Hostvero reference. The worker runs every five
-minutes by default and can be paused with `HOST_PAYOUT_SCHEDULER_ENABLED=false` for maintenance. Paystack transfer
-success, failure, and reversal events are verified using the existing HMAC-SHA512 webhook signature. A failed or
-reversed host transfer does not alter the successful guest payment or confirmed stay.
+Production serves real hosts and guests.
+
+Changes to production must follow the release and approval process defined in this document.
+
+Production data must never be used casually for development or testing.
+
+## 4. Configuration and Environment Variables
+
+Application configuration must be environment-specific.
+
+Requirements:
+
+- Keep production credentials outside the source repository.
+- Use the hosting provider's secure environment-variable or secret-management facilities.
+- Never commit passwords, API keys, private tokens, or database credentials.
+- Avoid hardcoding production URLs and credentials.
+- Document required configuration variables without including their secret values.
+- Validate required configuration during application startup where appropriate.
+
+Before deployment, verify:
+
+- Database connection configuration.
+- Application profile.
+- Authentication configuration.
+- Email provider configuration.
+- Payment provider configuration.
+- File or image storage configuration.
+- External service credentials.
+- Allowed frontend origins.
+- Logging configuration.
+
+Do not assume a variable exists simply because the application references it. Inspect the actual application configuration and deployment environment.
+
+## 5. Source Control and Release Management
+
+Production deployments must originate from reviewed and approved source code.
+
+Requirements:
+
+1. Work on the appropriate feature or maintenance branch.
+2. Avoid committing unrelated changes.
+3. Review the complete change set.
+4. Run the relevant tests.
+5. Merge through the approved process.
+6. Identify the exact commit being deployed.
+7. Record the release information.
+8. Verify the deployment result.
+
+Do not deploy unreviewed experimental changes.
+
+Do not deploy directly from an unfinished working branch.
+
+The deployed commit must be identifiable so that the application version can be traced to its source code.
+
+## 6. Pre-Deployment Checklist
+
+Before starting a production deployment:
+
+### Code
+
+- [ ] Confirm the correct branch and commit.
+- [ ] Review all changes.
+- [ ] Confirm no unrelated files are included.
+- [ ] Check for accidental secrets.
+- [ ] Confirm documentation is updated where necessary.
+
+### Build and Tests
+
+- [ ] Run the Maven build.
+- [ ] Run relevant automated tests.
+- [ ] Verify application packaging.
+- [ ] Check for dependency or compilation errors.
+- [ ] Review security-sensitive changes.
+- [ ] Verify important user journeys.
+
+### Database
+
+- [ ] Inspect the relevant Flyway migrations.
+- [ ] Confirm the actual production schema version.
+- [ ] Check migration compatibility with existing data.
+- [ ] Confirm backup availability.
+- [ ] Review destructive operations.
+- [ ] Prepare a recovery plan.
+
+### Infrastructure
+
+- [ ] Verify production environment variables.
+- [ ] Verify database connectivity.
+- [ ] Verify required external services.
+- [ ] Verify hosting configuration.
+- [ ] Verify domain and HTTPS configuration.
+- [ ] Confirm monitoring and logging availability.
+
+Do not proceed if a critical item remains unresolved.
+
+## 7. Build and Packaging
+
+Build the application using the repository's approved Maven configuration.
+
+The build must be performed from the correct project directory.
+
+Verify:
+
+- Java version compatibility.
+- Maven dependency resolution.
+- Compilation success.
+- Test results.
+- Packaging success.
+- Runtime configuration.
+
+Use the repository's existing build and deployment commands.
+
+Do not invent a new build command or modify the build configuration without inspecting the project first.
+
+Do not treat a successful compilation as proof that the application works correctly.
+
+## 8. Database Deployment
+
+Database changes require particular care.
+
+Flyway must manage schema changes through versioned migrations.
+
+Before applying a production migration:
+
+1. Inspect the migration file.
+2. Confirm the migration sequence.
+3. Verify the current production `flyway_schema_history`.
+4. Confirm whether the migration has already been applied.
+5. Review data compatibility.
+6. Check for destructive operations.
+7. Confirm a recent backup.
+8. Test the migration in a representative environment.
+9. Prepare a recovery procedure.
+
+Never assume that production is at the latest migration version in GitHub.
+
+Never edit an already-applied migration.
+
+Create a new sequential migration for additional schema changes.
+
+Do not manually modify the production schema to bypass Flyway without an explicitly approved recovery procedure.
+
+## 9. Application Deployment
+
+The exact deployment procedure must follow the hosting provider and configuration currently used by Hostvero.
+
+Before deployment:
+
+- Confirm the target service.
+- Confirm the deployment branch or commit.
+- Confirm the correct environment.
+- Confirm required configuration.
+- Confirm database availability.
+- Confirm migration behavior.
+
+During deployment:
+
+- Monitor build logs.
+- Monitor startup logs.
+- Confirm the application starts successfully.
+- Check database connectivity.
+- Check for migration errors.
+- Check external service initialization.
+
+After deployment, verify that the deployed version corresponds to the intended commit.
+
+Do not assume that a deployment succeeded merely because the hosting dashboard reports a build as completed.
+
+## 10. Post-Deployment Verification
+
+Perform verification after every production deployment.
+
+### Application Health
+
+Check:
+
+- Application startup.
+- Health endpoint, if configured.
+- Database connectivity.
+- Application logs.
+- Error rates.
+- External service connectivity.
+
+### Authentication
+
+Verify:
+
+- Host login.
+- Host session behavior.
+- Protected page access.
+- Unauthorized access handling.
+
+### Property Management
+
+Verify:
+
+- Property retrieval.
+- Property creation or editing where relevant.
+- Property photograph handling.
+- Host ownership restrictions.
+
+### Booking
+
+Verify:
+
+- Booking retrieval.
+- Date validation.
+- Availability checks.
+- Booking creation where safe.
+- Prevention of conflicting reservations.
+
+### Payments
+
+Where payment changes are involved, verify using the provider's appropriate test or production verification procedures.
+
+Do not create unnecessary real transactions simply to test a deployment.
+
+### Guest Experience
+
+Verify:
+
+- Guest link access.
+- Guest link expiration behavior.
+- Guest information protection.
+- Guest Stay Page access.
+- Relevant booking information.
+
+### Receipts and Notifications
+
+Verify:
+
+- Receipt retrieval.
+- Receipt persistence.
+- Email notification behavior.
+- Delivery failure handling.
+
+A successful email API request must not automatically be treated as proof that the recipient received the email.
+
+## 11. Monitoring and Logging
+
+Production must provide enough operational visibility to identify failures.
+
+Monitor:
+
+- Application availability.
+- Application startup failures.
+- HTTP error rates.
+- Database connectivity.
+- Database performance.
+- Slow requests.
+- Payment processing failures.
+- Email delivery failures.
+- Unexpected exceptions.
+- Security-related failures.
+
+Logs must not expose:
+
+- Passwords.
+- Secret keys.
+- Complete guest access tokens.
+- Sensitive payment information.
+- Unnecessary guest personal information.
+
+Use structured logs where appropriate.
+
+Logs should support diagnosis without compromising user privacy.
+
+## 12. Backup and Recovery
+
+Production data is critical.
+
+Before high-risk changes:
+
+- Confirm the backup schedule.
+- Confirm a recent successful backup.
+- Understand the restoration process.
+- Identify the responsible database.
+- Review the expected recovery time.
+- Identify the expected recovery point.
+- Confirm how restored data will be validated.
+
+Backups must be protected against unauthorized access.
+
+A backup is not considered reliable until restoration has been tested.
+
+Do not assume that reverting application code reverses a database migration.
+
+## 13. Rollback and Recovery
+
+Every production release should have a recovery plan appropriate to the change.
+
+### Application Rollback
+
+Where safe, a failed application release may be rolled back to the previous known-good application version.
+
+Before doing so, confirm that the previous application version remains compatible with the current database schema.
+
+### Database Recovery
+
+Database recovery is separate from application rollback.
+
+Never automatically reverse an applied production migration.
+
+A database rollback or restoration must be planned according to the actual migration and data changes.
+
+For destructive or incompatible migrations, obtain explicit approval and use the documented recovery procedure.
+
+### Incident Handling
+
+If a deployment causes a serious production issue:
+
+1. Identify the affected functionality.
+2. Assess the impact on hosts and guests.
+3
