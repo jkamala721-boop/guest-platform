@@ -122,6 +122,22 @@ Validation must cover relevant fields, including:
 
 Frontend validation improves usability but does not replace backend validation.
 
+### 5.5 Pagination, Filtering, and Sorting
+
+Endpoints that return potentially large collections should support appropriate pagination.
+
+Requirements:
+
+- Define consistent pagination parameters.
+- Apply reasonable default and maximum page sizes.
+- Support filtering only through explicitly permitted fields.
+- Support sorting only through explicitly permitted fields.
+- Enforce authorization before returning collection results.
+- Avoid exposing records belonging to another host.
+- Ensure pagination does not unintentionally disclose sensitive information.
+
+The exact response structure must follow the application's established API conventions.
+
 ## 6. Authentication and Authorization
 
 Private API operations must require appropriate authentication.
@@ -252,6 +268,25 @@ Payment notifications and webhooks must be authenticated or verified using the p
 
 Payment processing must be idempotent where duplicate requests or webhook deliveries are possible.
 
+### 7.7.1 Idempotency and Duplicate Processing
+
+Operations that may be retried or delivered more than once must be designed to prevent unintended duplicate business effects.
+
+This includes:
+
+- Booking creation.
+- Payment initiation.
+- Payment webhook processing.
+- Receipt generation.
+- Refund processing, where supported.
+- Other financially significant operations.
+
+Where appropriate, use idempotency keys or equivalent server-side safeguards.
+
+The backend must distinguish a legitimate retry from a new operation.
+
+Repeated requests must not create duplicate payments, bookings, receipts, or financial records.
+
 ### 7.8 Receipts
 
 Responsibilities:
@@ -312,6 +347,21 @@ Error responses must not expose:
 - Unnecessary personal information.
 
 Errors should provide enough information for the frontend to respond appropriately without revealing internal implementation details.
+
+### 8.1 Error Response Consistency
+
+API errors should follow a consistent response structure.
+
+Where appropriate, an error response should communicate:
+
+- A machine-readable error code.
+- A safe human-readable message.
+- Field-level validation errors where applicable.
+- A request or correlation identifier where available.
+
+Error responses must not expose stack traces, internal implementation details, secrets, or unnecessary personal information.
+
+The exact response structure must remain consistent with existing application conventions unless an approved API change establishes a new standard.
 
 ## 9. Security Requirements
 
@@ -532,6 +582,21 @@ Before changing an existing API:
 Avoid breaking existing frontend or guest-link workflows without an approved migration plan.
 
 When a breaking change is necessary, document the impact and transition approach.
+
+### 13.1 API Compatibility and Versioning
+
+Existing API behavior must be preserved unless a change is necessary and approved.
+
+Requirements:
+
+- Identify frontend and external consumers before changing an endpoint.
+- Avoid removing or renaming fields without assessing compatibility.
+- Avoid changing response types unexpectedly.
+- Document breaking changes.
+- Define a migration approach for affected clients.
+- Introduce explicit API versioning when compatibility requirements justify it.
+
+Do not introduce unnecessary versioning infrastructure for every API change.
 
 ## 14. API Documentation Checklist
 

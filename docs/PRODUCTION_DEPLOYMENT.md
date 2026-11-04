@@ -388,4 +388,64 @@ If a deployment causes a serious production issue:
 
 1. Identify the affected functionality.
 2. Assess the impact on hosts and guests.
-3
+3. Preserve relevant application, database, and deployment logs.
+4. Determine whether the issue affects application code, database migrations, configuration, or external services.
+5. Restrict affected functionality where necessary to prevent further damage.
+6. Decide whether application rollback or another recovery procedure is appropriate.
+7. Confirm database compatibility before rolling back application code.
+8. Apply the approved recovery procedure.
+9. Verify application health and critical user journeys.
+10. Confirm that booking, payment, guest access, and receipt records remain consistent.
+11. Communicate relevant service disruptions to affected users where necessary.
+12. Document the incident, recovery actions, and preventive improvements.
+
+## 14. Hostvero Deployment Configuration
+
+The repository currently contains a Render deployment configuration.
+
+The configuration defines:
+
+- Hosting service name: `hostvero`.
+- Runtime: Docker.
+- Spring profile: `prod`.
+- Health-check path: `/api/health`.
+- Application port: supplied through the `PORT` environment variable, with a default of `8080`.
+
+The application obtains its production database connection through:
+
+- `SUPABASE_DB_JDBC_URL`
+- `SUPABASE_DB_USERNAME`
+- `SUPABASE_DB_PASSWORD`
+
+Before deployment, confirm that these variables are correctly configured in the hosting environment.
+
+The repository configuration describes the intended deployment settings. It does not independently confirm the current hosting dashboard configuration or successful production connectivity.
+
+Do not change the deployment platform, service identity, or production database configuration without approval.
+
+## 15. Payment Provider Release Controls
+
+Payment providers may operate in different modes. Their configuration must be reviewed independently.
+
+The current repository Render configuration specifies:
+
+- M-Pesa: `mock`.
+- Stripe: `mock`.
+- Paystack: `live`.
+
+These are repository configuration values, not proof that live payment processing is operational.
+
+Before releasing payment-related changes:
+
+1. Confirm the intended payment mode for each provider.
+2. Verify the required production credentials.
+3. Confirm webhook configuration and signature verification.
+4. Verify transaction amount, currency, and booking association.
+5. Confirm duplicate webhook handling.
+6. Use provider-supported testing procedures where available.
+7. Confirm that failed or pending transactions cannot incorrectly mark bookings as paid.
+8. Review payment logs without exposing sensitive credentials or payment information.
+
+Never switch a provider from mock to live mode without explicit approval and appropriate production credentials.
+
+Never assume that changing one provider's configuration changes the mode of other providers.

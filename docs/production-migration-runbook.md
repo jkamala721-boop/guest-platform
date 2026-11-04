@@ -1,134 +1,486 @@
-# Hostvero production database migration runbook
+# Hostvero Production Database Migration Runbook
 
-Use this runbook for every production schema change. It protects the Supabase PostgreSQL database, preserves Flyway history, and verifies the Render deployment rather than treating a successful build as a successful release.
+## 1. Purpose and scope
 
-## Current production baseline
+This runbook defines the procedure for preparing, applying, and verifying production database schema changes for Hostvero.
 
-- PostgreSQL on Supabase
-- Flyway migrations currently through V20
-- Render production deployment
-- Spring Boot
-- Hibernate `validate`
-- Flyway `clean` disabled
-- Better Stack external health monitoring
+Its purpose is to protect production data, preserve Flyway migration history, and ensure that application releases remain compatible with the database.
 
-## 1. Before deployment
+This document describes the repository's configured production architecture. It does not independently verify the current state of the production database, Render dashboard, Supabase account, or external monitoring services.
 
-1. Confirm the working tree is clean before starting release work.
-2. Run focused tests relevant to the change.
-3. Run the full test suite:
+Never assume that repository configuration proves the live production state.
 
-   ```powershell
-   .\mvnw.cmd test
-   ```
+## 2. Repository-verified production configuration
 
-   Require `Failures: 0`, `Errors: 0`, and `BUILD SUCCESS`.
+The following configuration has been verified in the repository:
 
-4. Check the release diff:
+| Component | Repository configuration |
+|---|---|
+| Application | Spring Boot |
+| Hosting definition | Render web service named `hostvero` |
+| Container runtime | Docker |
+| Database | PostgreSQL |
+| Database configuration | Supabase connection variables |
+| Active production profile | `prod` |
+| Schema migration tool | Flyway |
+| Flyway migration locations | `db/core-migration` and `db/postgresql-migration` |
+| Hibernate schema behavior | `validate` |
+| Flyway production behavior | Enabled |
+| Flyway migration validation | Enabled |
+| Flyway clean protection | `clean-disabled=true` |
+| Application health-check path | `/api/health` |
+| Application port | Render-provided `PORT`, defaulting to 8080 |
 
-   ```powershell
-   git diff --check
-   ```
+Relevant configuration files:
 
-5. If frontend JavaScript changed, also run:
+- `render.yaml`
+- `src/main/resources/application.properties`
+- `src/main/resources/application-prod.properties`
+- `pom.xml`
+- `.env.example`
 
-   ```powershell
-   node --check src/main/resources/static/js/app.js
-   ```
+### 2.1 Migration version baseline
 
-6. Create a verified production backup:
+The repository currently contains versioned Flyway migrations through **V31**.
 
-   ```powershell
-   .\scripts\backup-production.ps1
-   ```
+Migrations are distributed across:
 
-   Confirm that the script reports `Verification: succeeded`. Backup files are never committed.
+- `src/main/resources/db/core-migration/`
+- `src/main/resources/db/postgresql-migration/`
 
-7. Confirm the new Flyway migration has the next unused version number. Existing migrations are immutable: **V1–V20 must never be edited.**
+The highest migration file in Git is not proof of the highest migration successfully applied to production.
 
-## 2. Migration rules
+Before every production migration, inspect the production `flyway_schema_history` table and record the actual installed version.
 
-- Every production schema change uses a new Flyway migration.
-- Never edit an already-deployed migration.
-- Never use Flyway `clean` in production.
-- Hibernate production mode remains `validate`; Flyway is the schema authority.
-- Make migration scripts backward-safe where practical so a rolling application deployment does not fail unexpectedly.
-- Destructive migrations require an explicit, reviewed recovery plan before deployment.
+Do not describe production as being at V31 unless the production database confirms it.
 
-## 3. Deployment
+### 2.2 Production details requiring independent verification
 
-Use the current release flow:
+Before relying on this runbook for a release, confirm:
 
-```powershell
-git add .
-git commit -m "<message>"
-git checkout main
-git pull origin main
-git merge phase-8-ux-redesign
-git push origin main
+- The deployment branch configured in the Render dashboard.
+- The exact production database and its connection status.
+- The highest successful Flyway migration in production.
+- Whether Better Stack monitoring is configured and active.
+- The current Supabase backup and recovery facilities available under the account's plan.
+- The current production domain and public health endpoint.
+- The validity of the production payment credentials and provider configuration.
+
+Do not put secret values or credentials in this document.
+
+## 3. Migration rules
+
+The following rules are mandatory:
+
+1. Every production schema change must use a new Flyway migration.
+2. Never edit a migration that has already been applied to production.
+3. Never use Flyway `clean` against production.
+4. Hibernate production mode must remain `validate`.
+5. Flyway is the authority for production schema changes.
+6. New migrations must use the next available version in the existing migration sequence.
+7. Migration versions must be unique across both configured Flyway locations.
+8. Review migration compatibility with the currently deployed application.
+9. Destructive changes require an explicit recovery plan and approval before deployment.
+10. Never delete production data simply to make a migration pass.
+
+Prefer backward-compatible migrations where practical. For changes requiring multiple releases, consider an expand-and-contract approach:
+
+1. Add the new schema structure without removing the old structure.
+2. Deploy application code compatible with both structures.
+3. Migrate or backfill existing data.
+4. Verify the new behavior.
+5. Remove obsolete structures in a later, separately reviewed migration.
+
+## 4. Before deployment
+
+### 4.1 Confirm the release source
+
+1. Confirm the intended release branch and commit.
+2. Confirm the deployment branch configured in Render.
+3. Confirm the release has been reviewed.
+4. Confirm that unrelated documentation or development changes are not included.
+5. Confirm the exact commit intended for production.
+
+Do not assume that a particular historical feature branch remains the approved production release branch.
+
+Do not merge or push a branch to `main` merely because an older runbook mentions it.
+
+Never force-push production `main`.
+
+### 4.2 Review and test the application
+
+From the repository root, run:
+
+```bash
+git status
+git diff --check
+./mvnw test
 ```
 
-Render deploys from GitHub `main`. Never force-push production `main`.
+Require:
 
-## 4. During Render deployment
+- Zero test failures.
+- Zero test errors.
+- Successful Maven build.
 
-- Watch the Render deployment and runtime logs.
-- Confirm Flyway detects the expected new migration.
-- Confirm the migration completes successfully.
-- Confirm Spring Boot starts successfully after Flyway completes.
-- Do not consider deployment complete merely because the Docker build succeeds.
+Run relevant focused tests as well as the full suite.
 
-## 5. Post-deploy verification
+If frontend JavaScript changes, run the applicable syntax checks. For example, if the file exists:
 
-1. Verify [the Hostvero health endpoint](https://app.hostvero.net/api/health) returns HTTP 200.
-2. Check the Better Stack uptime monitor.
-3. Check Render logs for Flyway, Hibernate, database, payment, and startup errors.
-4. Run a minimal smoke test of the feature affected by the migration.
+```bash
+node --check src/main/resources/static/js/app.js
+```
 
-## 6. If a migration fails
+Do not treat successful compilation as proof that the affected user journey works.
+
+### 4.3 Review the migration
+
+Before deployment:
+
+1. Inspect the complete migration SQL.
+2. Confirm the next unused version.
+3. Check both Flyway migration directories.
+4. Confirm that no duplicate version exists.
+5. Review foreign keys, indexes, constraints, and data transformations.
+6. Identify destructive or potentially expensive operations.
+7. Consider locking and execution time on production-sized tables.
+8. Confirm application compatibility before and after migration.
+9. Test the migration against a representative non-production database.
+
+### 4.4 Inspect production migration history
+
+Use an authorized, read-only database connection to inspect the production Flyway history.
+
+Example SQL:
+
+```sql
+SELECT
+    installed_rank,
+    version,
+    description,
+    type,
+    installed_on,
+    success
+FROM flyway_schema_history
+ORDER BY installed_rank;
+```
+
+Confirm:
+
+- The latest successfully installed migration.
+- Whether any migration has failed.
+- Whether the production history matches the expected release state.
+- Whether a migration in the proposed release has already been applied.
+
+Do not assume that the latest version in Git is the current production version.
+
+Do not manually modify `flyway_schema_history` to bypass migration problems.
+
+Record the observed production version in the release record.
+
+## 5. Production backup
+
+A suitable production backup must exist before a high-risk schema change.
+
+### 5.1 Current repository backup scripts
+
+The repository currently provides:
+
+- `scripts/backup-production.ps1`
+- `scripts/verify-backup.ps1`
+
+These scripts use PostgreSQL 18 Windows command-line tools located at:
+
+```text
+C:\Program Files\PostgreSQL\18\bin\
+```
+
+The backup script requires these environment variables:
+
+- `PGHOST`
+- `PGPORT`
+- `PGDATABASE`
+- `PGUSER`
+- `PGPASSWORD`
+
+Credentials must be supplied through the environment, never hardcoded in scripts or committed to Git.
+
+### 5.2 Run the backup from Windows PowerShell
+
+The current scripts are PowerShell scripts. From a Windows PowerShell terminal, run:
+
+```powershell
+.\scripts\backup-production.ps1
+```
+
+The script creates a custom-format database archive under:
+
+```text
+backups/
+```
+
+It checks that the archive exists, is non-empty, and can be listed using `pg_restore --list`.
+
+### 5.3 Verify an existing archive
+
+Run:
+
+```powershell
+.\scripts\verify-backup.ps1 -BackupPath "C:\path\to\backup.dump"
+```
+
+The verification script checks the archive's existence, non-zero size, and readability by `pg_restore --list`.
+
+**Important:** This is archive validation, not a complete database restore test.
+
+A successful archive listing does not prove that every database object and data record can be restored successfully.
+
+### 5.4 Backup acceptance and retention
+
+Before proceeding with a high-risk migration:
+
+- Confirm the backup command completed successfully.
+- Confirm the archive is non-empty.
+- Confirm archive validation succeeded.
+- Confirm the backup is stored securely.
+- Confirm that the backup is not staged or committed to Git.
+- Preserve the backup until the release is complete and the recovery window has passed.
+
+The `.gitignore` currently excludes:
+
+- `backups/`
+- `*.dump`
+
+### 5.5 Restore testing
+
+A full restore test must be performed against a separate, non-production PostgreSQL database.
+
+Never test a restore by overwriting the live production database.
+
+After restoring, verify:
+
+- Database objects and schema.
+- Required tables and indexes.
+- Migration history.
+- Representative records and relationships.
+- Application connectivity where appropriate.
+
+Do not claim that a backup is fully restorable until an actual restore has been tested.
+
+The availability of Supabase-managed backups and point-in-time recovery must be confirmed from the current account configuration. Do not assume a particular backup entitlement.
+
+## 6. Deployment procedure
+
+The exact production deployment procedure depends on the deployment branch and settings currently configured in Render.
+
+Before deploying:
+
+1. Confirm the intended commit.
+2. Confirm the configured Render deployment branch.
+3. Confirm the target production service.
+4. Confirm the required environment variables exist.
+5. Confirm production database connectivity.
+6. Confirm the migration has been reviewed and tested.
+7. Confirm the required backup exists.
+8. Confirm the recovery plan.
+
+Do not hardcode a historical feature branch into the release procedure.
+
+Do not assume that a local branch is the production deployment branch.
+
+Use the approved repository review and release process.
+
+## 7. During deployment
+
+Monitor the Render deployment and runtime logs.
+
+Confirm:
+
+1. The expected application commit is deployed.
+2. The container build completes.
+3. Flyway detects the expected migration.
+4. The migration completes successfully.
+5. Spring Boot starts successfully after migration.
+6. Hibernate validates the resulting schema.
+7. Database connectivity remains healthy.
+8. No critical startup or runtime errors appear.
+
+A successful Docker build alone does not mean the production release succeeded.
+
+Do not begin another deployment while the current migration or release is in an uncertain state.
+
+## 8. Post-deployment verification
+
+### 8.1 Application health
+
+The repository configures `/api/health` as the Render health-check path.
+
+Verify that the production health endpoint returns HTTP 200.
+
+The public hostname must be confirmed against the current Render and domain configuration before using a production URL.
+
+### 8.2 Database
+
+Verify:
+
+- Database connectivity.
+- Successful Flyway migration.
+- Expected production migration version.
+- No unexpected failed migration.
+- No Hibernate schema validation errors.
+- No unexpected database exceptions.
+
+### 8.3 Application functionality
+
+Perform a focused smoke test of the functionality affected by the release.
+
+Where relevant, verify:
+
+- Host authentication and session behavior.
+- Property ownership and access restrictions.
+- Booking creation and date validation.
+- Availability and conflicting reservation prevention.
+- Guest-link access and expiry behavior.
+- Payment initialization and server-side payment verification.
+- Receipt persistence and retrieval.
+- Guest information protection.
+- Email notification behavior.
+- Relevant administrative operations.
+
+Avoid unnecessary real payment transactions.
+
+Use provider-approved test procedures where available.
+
+### 8.4 Monitoring and logs
+
+Inspect:
+
+- Render deployment logs.
+- Application runtime logs.
+- Database errors.
+- Payment processing errors.
+- Notification delivery failures.
+- Authentication and security errors.
+
+Better Stack may be used if its production monitor is confirmed to be active.
+
+Do not treat an assumed monitoring configuration as verified monitoring coverage.
+
+A successful email API request is not proof that the recipient received the email.
+
+## 9. Failed migration procedure
+
+If a production migration fails:
 
 1. Stop further deployments.
-2. Do **not** edit the failed already-deployed migration blindly.
-3. Determine whether Flyway applied any part of it.
-4. Inspect `flyway_schema_history` and the actual production schema.
-5. Preserve the production backup.
-6. If the migration was transactional and rolled back, create a corrected **new** migration version where appropriate.
-7. If partial or non-transactional changes occurred, inspect actual state and write an explicit repair migration.
-8. Do not use Flyway `clean`.
-9. Do not delete production data merely to make a migration pass.
-10. Do not manually mark a migration successful unless the actual schema is proven equivalent and the decision is documented.
+2. Record the failed release and migration version.
+3. Inspect the Render deployment and application logs.
+4. Inspect `flyway_schema_history`.
+5. Inspect the actual production schema.
+6. Determine whether the migration was transactional.
+7. Determine whether any part of the migration was applied.
+8. Preserve the production backup.
+9. Assess the effect on existing application functionality.
+10. Prepare an explicit recovery or repair plan.
 
-## 7. Application failure after a successful migration
+Do not:
 
-If a schema migration succeeded but application code fails, prefer fixing or rolling forward the application code. Do not automatically reverse a successful migration. If rollback is unavoidable, use a specifically designed compensating migration; never edit migration history.
+- Edit an already-applied migration blindly.
+- Run Flyway `clean`.
+- Delete production data to make a migration pass.
+- Manually mark a migration successful without proving that the schema matches its intended result.
+- Assume that a failed migration left the database unchanged.
 
-## 8. Backup and restore
+If a transactional migration rolled back completely, a corrected new migration version may be appropriate.
 
-Supabase-managed automatic backups are unavailable on the current plan. Hostvero therefore uses local logical `pg_dump` backups before risky production migrations.
+If a migration partially applied changes, inspect the actual database state and design a repair migration based on that state.
 
-- Backup files live under `backups/` and are Git-ignored.
-- Backup verification uses `pg_restore --list`.
-- Test full restores only against a non-production database; never restore directly over production.
-- Preserve a verified backup until the release is complete and the recovery window has passed.
+Any manual intervention in migration history requires an explicit, reviewed recovery procedure and evidence that the resulting schema is correct.
 
-## 9. Security
+## 10. Application failure after a successful migration
+
+A successful migration and a failed application deployment are separate problems.
+
+If the database migration succeeded but the application fails:
+
+1. Identify the application failure.
+2. Inspect startup and runtime logs.
+3. Determine whether the previous application version is compatible with the new schema.
+4. Prefer a forward application fix when appropriate.
+5. Roll back application code only when compatibility has been established.
+
+Do not assume that reverting application code reverses a database migration.
+
+Do not automatically reverse a successful production migration.
+
+If database recovery is necessary, use a specifically designed compensating migration or an approved database restoration procedure.
+
+## 11. Security requirements
 
 - Never place database credentials in documentation.
-- Never commit `.env` files, dump files, keys, tokens, or passwords.
-- Production secrets stay in environment variables.
-- The backup script reads `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` only from the environment and never prints them.
+- Never commit `.env` files, database dumps, passwords, API keys, or tokens.
+- Keep production secrets in the hosting provider's secure environment configuration.
+- Do not expose database credentials in logs or terminal output.
+- Do not share production connection strings in issue reports or screenshots.
+- Do not log complete guest access tokens or sensitive payment information.
+- Restrict production database access to authorized personnel.
+- Use an appropriately scoped database account for operational tasks.
 
-## 10. Release checklist
+## 12. Release record
 
-- [ ] Focused tests run where relevant.
-- [ ] `./mvnw.cmd test` reports zero failures, zero errors, and `BUILD SUCCESS`.
+Record the following information for each production database release:
+
+| Field | Required information |
+|---|---|
+| Release date | Date and time of deployment |
+| Application commit | Exact deployed Git commit |
+| Release source | Approved branch or release reference |
+| Previous production migration | Version before deployment |
+| New production migration | Version applied |
+| Migration result | Success or failure |
+| Backup | Backup location and archive validation result |
+| Restore test | Whether a full restore was tested |
+| Application health | Health-check result |
+| Smoke test | Relevant functionality verified |
+| Recovery notes | Any issues or corrective actions |
+
+Do not record secret values or database credentials.
+
+## 13. Production release checklist
+
+### Before deployment
+
+- [ ] Correct release source and commit confirmed.
+- [ ] Render deployment branch confirmed.
+- [ ] Relevant tests completed.
+- [ ] Full Maven test suite passes.
 - [ ] `git diff --check` passes.
-- [ ] JavaScript syntax check passes when frontend code changed.
-- [ ] Verified production backup created; no dump files staged for Git.
-- [ ] New Flyway migration uses the next version; V1–V20 remain untouched.
-- [ ] Release merged and pushed to `main` without force-push.
-- [ ] Flyway reports the expected migration as successful on Render.
+- [ ] Migration SQL reviewed.
+- [ ] Migration version checked across both migration locations.
+- [ ] Production Flyway history inspected.
+- [ ] Migration tested against a representative non-production database.
+- [ ] Backup created and archive validation succeeds.
+- [ ] Recovery plan reviewed.
+- [ ] Production configuration checked.
+
+### During deployment
+
+- [ ] Expected application commit deployed.
+- [ ] Container build succeeds.
+- [ ] Expected Flyway migration detected.
+- [ ] Migration completes successfully.
 - [ ] Spring Boot starts successfully.
-- [ ] Health endpoint returns HTTP 200.
-- [ ] Render logs are clean and Better Stack is healthy.
-- [ ] A smoke test of the migrated feature passes.
+- [ ] Hibernate schema validation succeeds.
+- [ ] No critical runtime errors.
+
+### After deployment
+
+- [ ] Production health endpoint returns HTTP 200.
+- [ ] Production Flyway history reflects the expected migration.
+- [ ] Database connectivity confirmed.
+- [ ] Relevant smoke tests pass.
+- [ ] Payment and notification behavior checked where relevant.
+- [ ] Render logs reviewed.
+- [ ] Monitoring checked where configured.
+- [ ] Release record completed.
+- [ ] Backup retained through the recovery window.

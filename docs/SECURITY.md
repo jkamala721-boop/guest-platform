@@ -79,6 +79,33 @@ Authentication configuration must be inspected before making changes.
 
 Do not introduce a new authentication system without approval.
 
+### 4.1 Session and Cookie Security
+
+When cookie-based authentication is used:
+
+- Authentication cookies must use `HttpOnly`.
+- Production authentication cookies must use `Secure`.
+- Apply an appropriate `SameSite` policy based on the authentication and cross-origin requirements.
+- Session expiration must be enforced server-side.
+- Logout must invalidate the relevant server-side session or authentication mechanism.
+- Credential changes and account recovery must trigger appropriate session invalidation.
+- Session identifiers must not be exposed unnecessarily to JavaScript or third-party resources.
+- Session fixation risks must be addressed.
+
+Cookie and CSRF configuration must be reviewed together. Do not weaken CSRF protection merely to simplify frontend requests.
+
+### 4.2 Administrative Account Security
+
+Administrative functionality requires stricter access controls.
+
+- Apply least-privilege permissions to administrative accounts.
+- Require multi-factor authentication where supported.
+- Protect administrative endpoints with server-side authorization.
+- Audit sensitive administrative operations.
+- Restrict access to production credentials and infrastructure.
+- Review administrative account access periodically.
+- Remove or disable access when it is no longer required.
+
 ## 5. Authorization and Host Isolation
 
 Hostvero is a multi-host platform.
@@ -241,6 +268,22 @@ Requirements:
 
 Do not assume that a file is safe because the browser accepts it.
 
+## 10.1 Server-Side Request Forgery Protection
+
+Any backend functionality that retrieves or processes externally supplied URLs must be protected against SSRF.
+
+Requirements:
+
+- Validate URL schemes and destinations.
+- Restrict access to internal, private, and link-local network addresses.
+- Prevent access to cloud metadata endpoints.
+- Apply appropriate outbound network restrictions.
+- Validate redirects rather than automatically trusting redirect destinations.
+- Apply connection and response-size limits.
+- Do not assume that a URL is safe because it was submitted through the frontend.
+
+External URL processing must not provide an attacker with a way to access internal services or infrastructure.
+
 ## 11. API Security
 
 All API operations must have clearly defined security requirements.
@@ -345,6 +388,23 @@ Requirements:
 - Understand what data is transmitted to each provider.
 
 Do not send unnecessary guest personal information to third-party services.
+
+## 15.1 Encryption Keys and Secret Management
+
+Encryption keys and production secrets must be protected independently of the data they protect.
+
+Requirements:
+
+- Never hard-code encryption keys or production secrets.
+- Restrict access to authorized application components and operators.
+- Separate production secrets from development and testing environments.
+- Define a process for key rotation.
+- Define secure handling of compromised or exposed keys.
+- Protect backups containing sensitive information.
+- Ensure that key rotation does not make existing protected data permanently inaccessible.
+- Avoid logging secrets or key material.
+
+Key management must be considered part of the security architecture, not an implementation detail.
 
 ## 16. Future Review and Feedback Security
 

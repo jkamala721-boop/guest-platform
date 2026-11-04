@@ -232,7 +232,7 @@ When a change modifies documented behavior:
 - Update the relevant document.
 - Keep implementation and documentation consistent.
 - Distinguish implemented functionality from planned functionality.
-- Record important changes in `docs/CHANGELOG.md` when appropriate.
+- Record important changes in `CHANGELOG.md` when appropriate.
 
 Do not invent endpoints, database fields, integrations, or features.
 
