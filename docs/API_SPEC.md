@@ -1,175 +1,559 @@
-# Hostvero API Specification
+# API Specification
 
-This file defines the initial API direction.
+## 1. Purpose
 
-Exact payloads can be refined during implementation, but major resource boundaries should remain stable.
+This document defines the standards and documentation requirements for Hostvero's backend API.
 
----
+It serves as a reference for:
 
-## 1. Authentication
+- Frontend and backend integration.
+- API development.
+- Request and response structures.
+- Authentication and authorization.
+- Validation and error handling.
+- Security requirements.
+- Future API development.
 
-POST /api/auth/register
+**Important:** This document does not claim that every described capability or endpoint already exists.
 
-POST /api/auth/login
+Existing API endpoints must be verified against the actual source code. Proposed endpoints must remain clearly identified as future work until implemented and tested.
 
-POST /api/auth/logout
+## 2. Technology
 
-POST /api/auth/password-reset
+Hostvero's approved backend technology:
 
----
+- Java 21.
+- Spring Boot.
+- Spring Web.
+- Spring Security.
+- Spring Data JPA.
+- Hibernate.
+- PostgreSQL.
+- Flyway.
 
-## 2. Host profile
+The frontend currently uses HTML, CSS, and JavaScript.
 
-GET /api/me
+Do not introduce another backend framework or API technology without explicit approval.
 
-PUT /api/me
+## 3. API Documentation Status
 
----
+Every API operation documented in this file must have one of the following statuses:
 
-## 3. Properties
+| Status | Meaning |
+|---|---|
+| Implemented | Verified in the current source code and supported by tests or other implementation evidence. |
+| Partially implemented | Some functionality exists, but the complete behavior is not verified. |
+| Planned | Approved for future development but not yet implemented. |
+| Proposed | A possible future capability that still requires approval. |
 
-GET /api/properties
+Do not label an endpoint as implemented merely because a frontend page calls it or because it appears in an earlier development plan.
 
-POST /api/properties
+## 4. API Architecture
 
-GET /api/properties/{id}
+The intended request flow is:
 
-PUT /api/properties/{id}
+1. Frontend sends an HTTP request.
+2. Spring Security processes applicable security requirements.
+3. Controller receives the request.
+4. Request validation is performed.
+5. Service layer executes business logic.
+6. Repository layer accesses the database where necessary.
+7. Backend returns an appropriate response.
 
-DELETE or deactivate /api/properties/{id}
+Controllers should not contain substantial business logic.
 
-GET /api/properties/{id}/availability
+Business rules must remain in the service layer.
 
----
+Database entities should not be exposed directly as public API responses. Use appropriate request and response DTOs.
 
-## 4. Guests
+## 5. API Conventions
 
-GET /api/guests
+### 5.1 HTTP Methods
 
-GET /api/guests/{id}
+Use HTTP methods according to their intended purpose:
 
-Search/filter support should be added to GET /api/guests.
+| Method | Intended use |
+|---|---|
+| GET | Retrieve information. |
+| POST | Create a resource or initiate an operation. |
+| PUT | Replace or fully update a resource. |
+| PATCH | Partially update a resource. |
+| DELETE | Delete or deactivate a resource when permitted. |
 
----
+Do not use GET requests for operations that modify business data.
 
-## 5. Bookings
+### 5.2 Resource Naming
 
-GET /api/bookings
+Use consistent resource-oriented naming.
 
-POST /api/bookings
+Prefer clear nouns and predictable URL structures.
 
-GET /api/bookings/{id}
+Do not introduce inconsistent naming conventions between related endpoints.
 
-PUT /api/bookings/{id}
+The existing URL structure must be inspected before changing or introducing API routes.
 
-POST /api/bookings/{id}/cancel
+### 5.3 Request and Response Formats
 
-POST /api/bookings/{id}/extend
+Use JSON for ordinary API request and response bodies unless a specific integration requires another format.
 
-POST /api/bookings/{id}/confirm
+Responses should:
 
----
+- Have predictable structures.
+- Use appropriate HTTP status codes.
+- Avoid exposing internal database entities.
+- Avoid returning sensitive information unnecessarily.
+- Use consistent date and time representations.
+- Represent monetary values accurately.
 
-## 6. Public guest link
+### 5.4 Validation
 
-GET /guest/{token}
+Validate incoming requests on the backend.
 
-POST /guest/{token}/register
+Validation must cover relevant fields, including:
 
-POST /guest/{token}/payment-intent-or-initiation
+- Required values.
+- Data types.
+- Length limits.
+- Valid dates.
+- Date ordering.
+- Monetary values.
+- Resource ownership.
+- Business-specific restrictions.
 
-GET /guest/{token}/receipt
+Frontend validation improves usability but does not replace backend validation.
 
-GET /guest/{token}/stay
+## 6. Authentication and Authorization
 
-Public guest endpoints must validate the secure token and booking state.
+Private API operations must require appropriate authentication.
 
----
+The backend must distinguish between:
 
-## 7. Payments
+- Authenticated hosts.
+- Guests using authorized guest access.
+- Public requests.
+- Administrative operations, where applicable.
 
-GET /api/me/payout-settings
+Every private resource operation must enforce authorization.
 
-Returns only the authenticated host's payout configuration. Bank account numbers are masked and Paystack
-subaccount references are never returned.
+A host must not access another host's properties, bookings, guests, receipts, or other private records by changing an identifier.
 
-PUT /api/me/payout-settings
+Guest access must be limited to the intended booking and information.
 
-Creates or updates the authenticated host's Paystack payout destination. The request accepts only a bank-account
-method, Paystack settlement-bank code, full account number and account name. Hostvero uses the full number only for
-the provider request and persists only its final four digits. A configured destination is required before a Paystack
-booking payment can begin.
+Do not assume that knowing a resource ID grants permission to access it.
 
-POST /api/payments/mpesa/initiate
+## 7. Core API Domains
 
-POST /api/payments/stripe/create
+The following domains describe Hostvero's logical API responsibilities. They are not a verified list of existing routes.
 
-Provider callbacks/webhooks must have separate verified endpoints.
+### 7.1 Identity and Account Management
 
-Examples:
+Responsibilities:
 
-POST /api/webhooks/mpesa
+- Host registration.
+- Login and authentication.
+- Account profile management.
+- Account-related security operations.
+- Authentication state.
 
-POST /api/webhooks/stripe
+Existing routes and request formats must be extracted from the actual controllers and security configuration.
 
-POST /api/webhooks/paystack
+### 7.2 Property Management
 
-Paystack checkout is initialized through the existing booking payment endpoint using
-`{"provider":"PAYSTACK"}`. The browser receives only the Paystack authorization URL; the webhook is authoritative.
-For a host with configured payout settings, Hostvero submits that host's Paystack subaccount plus a flat
-`transaction_charge` equal to the server-calculated Hostvero service fee. Paystack's main account bears processor
-fees; the host subaccount settlement target remains the booking amount.
+Responsibilities:
 
-Do not mark a payment successful from a browser-only response.
+- Creating properties.
+- Retrieving properties.
+- Updating property details.
+- Managing property photographs.
+- Managing property facilities and descriptions.
+- Managing property-specific information.
 
----
+All host-owned property operations must enforce ownership.
 
-## 8. Receipts
+Image uploads must be validated and securely handled.
 
-GET /api/bookings/{id}/receipts
+### 7.3 Guest Management
 
-GET /api/receipts/{id}
+Responsibilities:
 
-POST /api/receipts/{id}/resend
+- Guest registration.
+- Guest information retrieval where authorized.
+- Guest information associated with bookings.
+- Digital Guest Register functionality.
 
----
+Guest personal information must not be exposed through public endpoints without a legitimate and authorized purpose.
 
-## 9. Availability
+### 7.4 Booking Management
 
-GET /api/properties/{id}/availability?from=...&to=...
+Responsibilities:
 
-For Book Again, a later endpoint may expose available ranges/dates.
+- Booking creation.
+- Booking retrieval.
+- Booking updates.
+- Booking status management.
+- Check-in and check-out information.
+- Booking extensions where supported.
+- Booking-related pricing information.
 
-All availability APIs must call the centralized AvailabilityService.
+The backend must validate the booking dates and property availability.
 
----
+Changing a property price must not silently change the agreed price of an existing booking.
 
-## 10. Dashboard
+### 7.5 Availability
 
-GET /api/dashboard
+Availability is a critical business domain.
 
-The dashboard response may include:
+All booking-related operations must use the same authoritative backend availability rules.
 
-- arrivals today
-- departures today
-- current guests
-- upcoming bookings
-- pending payments
-- today's revenue
-- recent activity
+This includes:
 
----
+- Checking available dates.
+- Creating reservations.
+- Updating reservation dates.
+- Extending stays.
+- Preventing conflicting reservations.
 
-## 11. Authorization
+The frontend must never be the final authority for availability.
 
-All host API endpoints require host authentication.
+Concurrent booking attempts must be handled safely.
 
-Hosts may access only their own:
+### 7.6 Guest Access Links
 
-- properties
-- guests
-- bookings
-- payments
-- receipts
+Responsibilities:
 
-Public guest-link endpoints use secure guest tokens instead of host authentication.
+- Generating guest access links.
+- Validating guest access.
+- Handling expiration.
+- Revoking access.
+- Restricting access to the correct booking.
+
+Guest links must use secure tokens and server-side validation.
+
+Expired or revoked links must not provide access to protected stay information.
+
+A guest link's expiration must not delete the host's booking or receipt records.
+
+### 7.7 Payments
+
+Responsibilities:
+
+- Initiating payment operations.
+- Receiving payment provider notifications.
+- Verifying payment results.
+- Updating payment status.
+- Associating payments with bookings.
+- Handling supported payment adjustments or refunds.
+
+Payment status must be verified server-side.
+
+Never trust a browser redirect, frontend message, or client-submitted payment status as proof of successful payment.
+
+Payment notifications and webhooks must be authenticated or verified using the payment provider's documented mechanism.
+
+Payment processing must be idempotent where duplicate requests or webhook deliveries are possible.
+
+### 7.8 Receipts
+
+Responsibilities:
+
+- Creating receipts after the appropriate verified business event.
+- Retrieving receipts for authorized users.
+- Resending receipts where supported.
+
+Receipts must remain available to the host even if a guest access link expires.
+
+Receipt information must reflect the actual recorded financial transaction.
+
+### 7.9 Notifications
+
+Responsibilities may include:
+
+- Guest registration notifications.
+- Host notifications.
+- Booking updates.
+- Payment-related notifications.
+- Receipt delivery.
+- Feedback invitations.
+
+Email delivery failure must not incorrectly reverse a completed booking or verified payment.
+
+Notification delivery status must be tracked separately from the underlying business event.
+
+## 8. API Error Handling
+
+Use appropriate HTTP status codes.
+
+Common examples:
+
+| Status | Meaning |
+|---|---|
+| 200 | Successful request. |
+| 201 | Resource created. |
+| 204 | Successful operation with no response body. |
+| 400 | Invalid request or validation failure. |
+| 401 | Authentication required or invalid. |
+| 403 | Authenticated user is not authorized. |
+| 404 | Resource not found or intentionally unavailable. |
+| 409 | Conflict with current resource or business state. |
+| 422 | Semantically invalid request, where this convention is adopted. |
+| 429 | Rate limit exceeded. |
+| 500 | Unexpected server error. |
+
+Use the conventions already established in the application where possible.
+
+Error responses must not expose:
+
+- Stack traces.
+- Database credentials.
+- Internal SQL statements.
+- Secret tokens.
+- Passwords.
+- Sensitive configuration.
+- Unnecessary personal information.
+
+Errors should provide enough information for the frontend to respond appropriately without revealing internal implementation details.
+
+## 9. Security Requirements
+
+All API development must consider:
+
+- Authentication.
+- Authorization.
+- Host and property ownership.
+- Guest token security.
+- Input validation.
+- SQL injection prevention.
+- Cross-site request protections where applicable.
+- Rate limiting.
+- Secure file uploads.
+- Payment webhook verification.
+- Sensitive information exposure.
+- Logging and audit requirements.
+
+Public endpoints must be deliberately defined.
+
+Do not make private endpoints public simply to simplify frontend integration.
+
+## 10. API Documentation Format
+
+Every verified endpoint should eventually be documented using this structure:
+
+### Endpoint Documentation Template
+
+**Name:** Clear operation name.
+
+**Status:** Implemented / Partially implemented / Planned / Proposed.
+
+**HTTP Method:** Actual HTTP method.
+
+**Route:** Exact verified route.
+
+**Authentication:** Required / Not required / Guest token.
+
+**Authorization:** Required permissions and ownership rules.
+
+**Purpose:** What the operation does.
+
+**Path Parameters:** Parameters included in the route.
+
+**Query Parameters:** Supported query parameters.
+
+**Request Body:** Actual request structure, if applicable.
+
+**Validation:** Required validation rules.
+
+**Success Response:** Actual response structure and status code.
+
+**Error Responses:** Relevant error conditions and status codes.
+
+**Business Rules:** Important backend rules.
+
+**Security Notes:** Relevant security considerations.
+
+**Implementation Evidence:** Controller, service, DTO, and test references.
+
+Do not fill this template with guessed routes or invented JSON structures.
+
+## 11. Future API Requirements
+
+The following capabilities are planned or proposed. They must not be treated as existing API functionality.
+
+### 11.1 Property Reviews
+
+Future functionality may include:
+
+- Submitting a review after an eligible completed stay.
+- Retrieving published property reviews.
+- Managing review moderation.
+- Preventing duplicate reviews for the same eligible booking.
+
+The backend must verify review eligibility.
+
+A guest must not be able to submit a review for an unrelated property or booking.
+
+### 11.2 Hostvero Platform Ratings
+
+Hostvero platform ratings are separate from property reviews.
+
+Future functionality may include:
+
+- A permanent platform feedback page.
+- Submitting a star rating.
+- Submitting written feedback.
+- Managing feedback visibility.
+- Obtaining consent before publishing testimonials.
+
+Platform ratings must not be confused with ratings of individual properties.
+
+### 11.3 Feedback Invitations
+
+Future functionality may include:
+
+- Sending platform rating invitations after meaningful product use.
+- Sending property review invitations after eligible stays.
+- Tracking invitation delivery and submission.
+- Preventing accidental repeated invitations.
+
+Invitation eligibility and timing must be enforced by backend rules.
+
+### 11.4 AI Review Analysis
+
+Future functionality may analyze property reviews to identify recurring issues.
+
+Potential capabilities:
+
+- Grouping recurring feedback themes.
+- Identifying sentiment.
+- Finding repeated operational problems.
+- Summarizing supporting evidence.
+- Providing host-facing insights.
+
+AI analysis must respect host ownership and data access boundaries.
+
+### 11.5 AI Recommendations
+
+Future functionality may provide practical recommendations based on review evidence.
+
+The API design should distinguish:
+
+- Generated recommendations.
+- Supporting evidence.
+- Host acknowledgment.
+- Host actions.
+- Completion status.
+
+AI must not autonomously modify bookings, payments, or financial records.
+
+### 11.6 Adaptive Guest Questions
+
+Future review forms may include optional, neutral questions based on previously identified property improvement areas.
+
+Questions must not reveal another guest's private feedback.
+
+### 11.7 Host Network
+
+Future Host Network functionality may include:
+
+- Finding participating hosts.
+- Discovering suitable available properties.
+- Sending referral requests.
+- Accepting or declining referrals.
+- Sharing guest referral information with appropriate consent.
+
+The system must verify host and property ownership.
+
+The initial product direction does not include referral commissions.
+
+Guests must not need Hostvero accounts to use a referred guest booking link.
+
+### 11.8 Host Education and Knowledge Community
+
+A separate future API domain may support:
+
+- Educational guides.
+- Host discussions.
+- Community content.
+- Participation.
+- Moderation.
+
+This must remain separate from the Host Network referral workflow.
+
+### 11.9 Host-Branded Email Templates
+
+Future functionality may allow hosts to customize approved email branding, including:
+
+- Business or property name.
+- Logo.
+- Brand colors.
+- Contact information.
+- Approved footer content.
+
+Customization must not permit unsafe HTML or unrestricted script injection.
+
+## 12. API Testing Requirements
+
+API changes must include appropriate tests.
+
+Tests should cover:
+
+- Successful requests.
+- Invalid requests.
+- Missing authentication.
+- Insufficient permissions.
+- Cross-host access attempts.
+- Missing resources.
+- Duplicate requests.
+- Booking date validation.
+- Availability conflicts.
+- Payment verification.
+- Guest link expiration and revocation.
+- Notification failures.
+- Relevant integration failures.
+
+Tests must verify both expected behavior and important security boundaries.
+
+Do not claim an endpoint is fully implemented without checking its actual behavior.
+
+## 13. API Change Management
+
+Before changing an existing API:
+
+1. Locate the controller and route.
+2. Inspect its service implementation.
+3. Inspect request and response DTOs.
+4. Identify frontend consumers.
+5. Identify external integrations.
+6. Review authentication and authorization.
+7. Review existing tests.
+8. Assess compatibility with existing clients.
+9. Update this document.
+10. Run relevant tests.
+
+Avoid breaking existing frontend or guest-link workflows without an approved migration plan.
+
+When a breaking change is necessary, document the impact and transition approach.
+
+## 14. API Documentation Checklist
+
+Before marking an API operation as documented:
+
+- [ ] Confirm the route in the actual source code.
+- [ ] Confirm the HTTP method.
+- [ ] Confirm authentication requirements.
+- [ ] Confirm authorization and ownership checks.
+- [ ] Inspect request DTOs.
+- [ ] Inspect response DTOs.
+- [ ] Verify validation rules.
+- [ ] Verify error handling.
+- [ ] Inspect the service-layer business logic.
+- [ ] Review relevant tests.
+- [ ] Record the implementation status.
+- [ ] Update this document when behavior changes.
+
+## 15. Final Principle
+
+The API is the enforcement boundary for Hostvero's business rules and security.
+
+The frontend may guide users, but the backend must validate every important operation.
+
+Document what exists, distinguish it from what is planned, and never treat an unimplemented endpoint as a working feature.
