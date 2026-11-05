@@ -23,6 +23,8 @@ import com.guest_platform.security.AdminPrincipal;
 import com.guest_platform.service.AdminAuditService;
 import com.guest_platform.service.AdminAuthenticationService;
 import com.guest_platform.service.AdminSessionService;
+import com.guest_platform.security.IdentityRateLimitService;
+import com.guest_platform.security.PublicRateLimiter.Category;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -31,17 +33,21 @@ public class AdminAuthenticationController {
     private final AdminSessionService sessions;
     private final AdminUserRepository admins;
     private final AdminAuditService audit;
+    private final IdentityRateLimitService identityRateLimits;
 
     public AdminAuthenticationController(AdminAuthenticationService authenticationService,
-            AdminSessionService sessions, AdminUserRepository admins, AdminAuditService audit) {
+            AdminSessionService sessions, AdminUserRepository admins, AdminAuditService audit,
+            IdentityRateLimitService identityRateLimits) {
         this.authenticationService = authenticationService;
         this.sessions = sessions;
         this.admins = admins;
         this.audit = audit;
+        this.identityRateLimits = identityRateLimits;
     }
 
     @PostMapping("/auth/login")
     public ResponseEntity<AdminMeResponse> login(@Valid @RequestBody AdminLoginRequest request) {
+        identityRateLimits.check(Category.ADMIN_LOGIN, "admin-login", request.email());
         AdminAuthenticationService.AuthenticatedAdmin result = authenticationService.login(request);
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, sessions.sessionCookie(result.token()).toString())
                 .body(result.response());

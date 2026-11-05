@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
+import com.guest_platform.security.RateLimitExceededException;
+
 class ApiExceptionHandlerTest {
 
     private final ApiExceptionHandler handler = new ApiExceptionHandler();
@@ -32,5 +34,16 @@ class ApiExceptionHandlerTest {
 
         assertThat(response.getBody().code()).isEqualTo("INTERNAL_ERROR");
         assertThat(response.getBody().message()).doesNotContain("secret");
+    }
+
+    @Test
+    void mapsRateLimitExceptionToTheExistingRetryable429Response() {
+        var response = handler.rateLimited(new RateLimitExceededException(37));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(429);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("37");
+        assertThat(response.getBody().code()).isEqualTo("RATE_LIMITED");
+        assertThat(response.getBody().message()).isEqualTo("Too many attempts. Please wait and try again.");
+        assertThat(response.getBody().retryable()).isTrue();
     }
 }
