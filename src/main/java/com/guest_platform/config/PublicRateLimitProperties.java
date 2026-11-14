@@ -12,6 +12,8 @@ public class PublicRateLimitProperties {
     private Limit adminLogin = new Limit(5, 900);
     private Limit registration = new Limit(5, 3600);
     private Limit guestLink = new Limit(120, 300);
+    private Limit guestRegistration = new Limit(20, 900);
+    private Limit guestBookingChange = new Limit(10, 900);
     private Limit otpRequest = new Limit(5, 900);
     private Limit otpVerify = new Limit(10, 900);
     private Limit returningGuestLookup = new Limit(5, 900);
@@ -31,6 +33,10 @@ public class PublicRateLimitProperties {
     public void setRegistration(Limit registration) { this.registration = registration; }
     public Limit getGuestLink() { return guestLink; }
     public void setGuestLink(Limit guestLink) { this.guestLink = guestLink; }
+    public Limit getGuestRegistration() { return guestRegistration; }
+    public void setGuestRegistration(Limit guestRegistration) { this.guestRegistration = guestRegistration; }
+    public Limit getGuestBookingChange() { return guestBookingChange; }
+    public void setGuestBookingChange(Limit guestBookingChange) { this.guestBookingChange = guestBookingChange; }
     public Limit getOtpRequest() { return otpRequest; }
     public void setOtpRequest(Limit otpRequest) { this.otpRequest = otpRequest; }
     public Limit getOtpVerify() { return otpVerify; }

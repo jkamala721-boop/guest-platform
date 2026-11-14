@@ -25,10 +25,20 @@ import com.guest_platform.exception.HostOnboardingIncompleteException;
 import com.guest_platform.exception.HostOperationalAccessException;
 import org.springframework.security.access.AccessDeniedException;
 import com.guest_platform.service.payment.PaystackApiClient.PaystackRequestRejectedException;
+import com.guest_platform.security.RateLimitExceededException;
+import org.springframework.http.HttpHeaders;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ApiErrorResponse> rateLimited(RateLimitExceededException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getRetryAfterSeconds()))
+                .body(new ApiErrorResponse("RATE_LIMITED", "Too many attempts. Please wait and try again.",
+                        null, true, null));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiErrorResponse> validation(MethodArgumentNotValidException exception) {

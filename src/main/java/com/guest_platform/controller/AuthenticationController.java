@@ -15,6 +15,8 @@ import com.guest_platform.dto.LoginRequest;
 import com.guest_platform.dto.RegisterRequest;
 import com.guest_platform.service.AuthenticationService;
 import com.guest_platform.service.HostSessionService;
+import com.guest_platform.security.IdentityRateLimitService;
+import com.guest_platform.security.PublicRateLimiter.Category;
 
 import jakarta.validation.Valid;
 import jakarta.servlet.http.Cookie;
@@ -27,20 +29,24 @@ public class AuthenticationController {
 
     private final AuthenticationService authenticationService;
     private final HostSessionService hostSessionService;
+    private final IdentityRateLimitService identityRateLimits;
 
     public AuthenticationController(AuthenticationService authenticationService,
-            HostSessionService hostSessionService) {
+            HostSessionService hostSessionService, IdentityRateLimitService identityRateLimits) {
         this.authenticationService = authenticationService;
         this.hostSessionService = hostSessionService;
+        this.identityRateLimits = identityRateLimits;
     }
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        identityRateLimits.check(Category.REGISTRATION, "host-registration", request.email());
         return authenticatedResponse(HttpStatus.CREATED, authenticationService.register(request));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        identityRateLimits.check(Category.LOGIN, "host-login", request.email());
         return authenticatedResponse(HttpStatus.OK, authenticationService.login(request));
     }
 

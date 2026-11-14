@@ -170,15 +170,20 @@ class AdminSecurityIntegrationTest {
     }
 
     @Test
-    void adminLoginIsRateLimitedByIp() throws Exception {
+    void adminLoginIsRateLimitedByNormalizedIdentityAndIsolatedFromOtherAccounts() throws Exception {
         String ip = "10.20.30.40";
         for (int attempt = 0; attempt < 5; attempt++) {
             login("rate-limit@hostvero.net", "WrongPassword!123", ip).andExpect(status().isUnauthorized());
         }
-        login("rate-limit@hostvero.net", "WrongPassword!123", ip)
+        login("RATE-LIMIT@hostvero.net", "WrongPassword!123", "10.20.30.41")
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
-                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+                .andExpect(jsonPath("$.message").value("Too many attempts. Please wait and try again."))
+                .andExpect(jsonPath("$.retryable").value(true))
+                .andExpect(jsonPath("$.validationErrors").doesNotExist());
+        login("different-account@hostvero.net", "WrongPassword!123", ip)
+                .andExpect(status().isUnauthorized());
     }
 
     private org.springframework.test.web.servlet.ResultActions login(String email, String password, String ip) throws Exception {

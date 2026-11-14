@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,8 @@ class HostPayoutSettingsIntegrationTest {
     void hostCanManageOnlyOwnMaskedPayoutSettingsWithoutDuplicateSubaccounts() throws Exception {
         String firstHost = register("payout-first@example.com", "First Payout Host");
         String secondHost = register("payout-second@example.com", "Second Payout Host");
+        var firstHostRecord = hostRepository.findByEmailIgnoreCase("payout-first@example.com").orElseThrow();
+        var secondHostRecord = hostRepository.findByEmailIgnoreCase("payout-second@example.com").orElseThrow();
 
         mockMvc.perform(get("/api/me/payout-settings").header("Authorization", bearer(firstHost)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(false));
@@ -55,12 +58,8 @@ class HostPayoutSettingsIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))
                 .andExpect(jsonPath("$.maskedAccountNumber").value("****6789"))
                 .andExpect(jsonPath("$.paystackSubaccountCode").doesNotExist());
-        String initialSubaccount = payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getAccountName().equals("First Payout Account"))
-                .findFirst().orElseThrow().getPaystackSubaccountCode();
-        var initialSettings = payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getPaystackSubaccountCode().equals(initialSubaccount))
-                .findFirst().orElseThrow();
+        var initialSettings = payoutSettingsRepository.findByHostId(firstHostRecord.getId()).orElseThrow();
+        String initialSubaccount = initialSettings.getPaystackSubaccountCode();
         assertThat(initialSettings.getPaystackSubaccountDomain()).isEqualTo("mock");
         assertThat(initialSettings.getPaystackSubaccountActive()).isTrue();
         assertThat(initialSettings.getPaystackSubaccountVerified()).isTrue();
@@ -68,10 +67,9 @@ class HostPayoutSettingsIntegrationTest {
         mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(firstHost))
                         .contentType(MediaType.APPLICATION_JSON).content(settings("9876543210")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.maskedAccountNumber").value("****3210"));
-        assertThat(payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getAccountName().equals("First Payout Account")).toList()).hasSize(1);
-        assertThat(payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getAccountName().equals("First Payout Account")).findFirst().orElseThrow()
+        assertThat(payoutSettingsRepository.findAllByHostIdIn(List.of(firstHostRecord.getId())))
+                .hasSize(1);
+        assertThat(payoutSettingsRepository.findByHostId(firstHostRecord.getId()).orElseThrow()
                 .getPaystackSubaccountCode()).isEqualTo(initialSubaccount);
 
         mockMvc.perform(get("/api/me/payout-settings").header("Authorization", bearer(secondHost)))
@@ -80,9 +78,8 @@ class HostPayoutSettingsIntegrationTest {
         mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(secondHost))
                         .contentType(MediaType.APPLICATION_JSON).content(settings("1111222233")))
                 .andExpect(status().isOk());
-        String secondSubaccount = payoutSettingsRepository.findAll().stream()
-                .filter(settings -> "****2233".equals("****" + settings.getAccountNumberLast4()))
-                .findFirst().orElseThrow().getPaystackSubaccountCode();
+        String secondSubaccount = payoutSettingsRepository.findByHostId(secondHostRecord.getId()).orElseThrow()
+                .getPaystackSubaccountCode();
         assertThat(secondSubaccount).isNotEqualTo(initialSubaccount);
     }
 
@@ -90,13 +87,13 @@ class HostPayoutSettingsIntegrationTest {
     void bookingOwnerDeterminesStoredSplitDestinationAndClientCannotOverrideIt() throws Exception {
         String firstToken = register("split-owner-a@example.com", "Split Owner A");
         String secondToken = register("split-owner-b@example.com", "Split Owner B");
+        var firstHost = hostRepository.findByEmailIgnoreCase("split-owner-a@example.com").orElseThrow();
+        var secondHost = hostRepository.findByEmailIgnoreCase("split-owner-b@example.com").orElseThrow();
         configure(firstToken, "0123456789", "Owner A Account");
         configure(secondToken, "9876543210", "Owner B Account");
-        String firstCode = payoutSettingsRepository.findAll().stream()
-                .filter(value -> "Owner A Account".equals(value.getAccountName())).findFirst().orElseThrow()
+        String firstCode = payoutSettingsRepository.findByHostId(firstHost.getId()).orElseThrow()
                 .getPaystackSubaccountCode();
-        String secondCode = payoutSettingsRepository.findAll().stream()
-                .filter(value -> "Owner B Account".equals(value.getAccountName())).findFirst().orElseThrow()
+        String secondCode = payoutSettingsRepository.findByHostId(secondHost.getId()).orElseThrow()
                 .getPaystackSubaccountCode();
 
         String firstBooking = createBooking(firstToken, createProperty(firstToken), createGuest(firstToken),
@@ -156,6 +153,7 @@ class HostPayoutSettingsIntegrationTest {
     @Test
     void hostCanConfigureMaskedMpesaRecipientWithoutDuplicatingItOnRepeatSave() throws Exception {
         String host = register("payout-mpesa@example.com", "M-Pesa Payout Host");
+        var hostRecord = hostRepository.findByEmailIgnoreCase("payout-mpesa@example.com").orElseThrow();
 
         mockMvc.perform(get("/api/me/payout-settings/banks").header("Authorization", bearer(host)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].code").value("KEPSS-TEST"));
@@ -166,24 +164,36 @@ class HostPayoutSettingsIntegrationTest {
                 .andExpect(jsonPath("$.payoutMethod").value("MPESA"))
                 .andExpect(jsonPath("$.maskedMpesaPhone").value("****5678"))
                 .andExpect(jsonPath("$.paystackRecipientCode").doesNotExist());
-        String recipientCode = payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getPayoutMethod().name().equals("MPESA"))
-                .findFirst().orElseThrow().getPaystackRecipientCode();
+        var settingsAfterInitialSave = payoutSettingsRepository.findAllByHostIdIn(
+                List.of(hostRecord.getId()));
+        assertThat(settingsAfterInitialSave).hasSize(1);
+        var initialSettings = settingsAfterInitialSave.get(0);
+        assertThat(initialSettings.getPayoutMethod()).isEqualTo(PayoutMethod.MPESA);
+        assertThat(initialSettings.getMpesaPhoneLast4()).isEqualTo("5678");
+        String recipientCode = initialSettings.getPaystackRecipientCode();
+        String phoneFingerprint = initialSettings.getMpesaPhoneFingerprint();
+        assertThat(recipientCode).isNotBlank();
+        assertThat(phoneFingerprint).isNotBlank();
 
         mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(host))
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
                                 "payoutMethod", "MPESA", "mpesaPhone", "+254712345678"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.maskedMpesaPhone").value("****5678"));
-        assertThat(payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getPayoutMethod().name().equals("MPESA")).toList()).hasSize(1);
-        assertThat(payoutSettingsRepository.findAll().stream()
-                .filter(settings -> settings.getPayoutMethod().name().equals("MPESA")).findFirst().orElseThrow()
-                .getPaystackRecipientCode()).isEqualTo(recipientCode);
+        var settingsAfterRepeatSave = payoutSettingsRepository.findAllByHostIdIn(
+                List.of(hostRecord.getId()));
+        assertThat(settingsAfterRepeatSave).hasSize(1);
+        var updatedSettings = settingsAfterRepeatSave.get(0);
+        assertThat(updatedSettings.getPayoutMethod()).isEqualTo(PayoutMethod.MPESA);
+        assertThat(updatedSettings.getPaystackRecipientCode()).isEqualTo(recipientCode);
+        assertThat(updatedSettings.getMpesaPhoneLast4()).isEqualTo("5678");
+        assertThat(updatedSettings.getMpesaPhoneFingerprint()).isEqualTo(phoneFingerprint);
 
         mockMvc.perform(put("/api/me/payout-settings").header("Authorization", bearer(host))
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(Map.of(
                                 "payoutMethod", "MPESA", "mpesaPhone", "123"))))
                 .andExpect(status().isBadRequest());
+        assertThat(payoutSettingsRepository.findAllByHostIdIn(List.of(hostRecord.getId())))
+                .hasSize(1);
     }
 
     @Test
@@ -199,7 +209,8 @@ class HostPayoutSettingsIntegrationTest {
         payoutSettingsRepository.saveAndFlush(new HostPayoutSettings(second, PayoutMethod.MPESA, null, null, null,
                 null, sharedProviderRecipient, "5678", "a".repeat(64)));
 
-        assertThat(payoutSettingsRepository.findAll().stream()
+        assertThat(payoutSettingsRepository.findAllByHostIdIn(
+                List.of(first.getId(), second.getId())).stream()
                 .filter(value -> sharedProviderRecipient.equals(value.getPaystackRecipientCode())))
                 .hasSize(2);
     }

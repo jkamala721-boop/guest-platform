@@ -23,7 +23,9 @@ import com.guest_platform.config.PublicRateLimitProperties.Limit;
 public class PublicRateLimiter {
 
     public enum Category {
-        LOGIN, ADMIN_LOGIN, REGISTRATION, GUEST_LINK, OTP_REQUEST, OTP_VERIFY, RETURNING_GUEST_LOOKUP, RETURNING_GUEST_VERIFY, PAYMENT_INITIALIZATION, PAYSTACK_WEBHOOK
+        LOGIN, ADMIN_LOGIN, REGISTRATION, GUEST_LINK, GUEST_REGISTRATION, GUEST_BOOKING_CHANGE,
+        OTP_REQUEST, OTP_VERIFY, RETURNING_GUEST_LOOKUP, RETURNING_GUEST_VERIFY, PAYMENT_INITIALIZATION,
+        PAYSTACK_WEBHOOK
     }
 
     public record Decision(boolean allowed, long retryAfterSeconds) {
@@ -93,12 +95,19 @@ public class PublicRateLimiter {
         }
     }
 
+    /** Hashes a normalized account identifier with a distinct purpose/domain prefix. */
+    public static String hashIdentity(String domain, String normalizedIdentifier) {
+        return hashIdentifier("hostvero:rate-limit:" + domain + ":" + normalizedIdentifier);
+    }
+
     private Map<Category, Policy> policies(PublicRateLimitProperties source) {
         Map<Category, Policy> result = new EnumMap<>(Category.class);
         result.put(Category.LOGIN, policy(source.getLogin(), 10, 900));
         result.put(Category.ADMIN_LOGIN, policy(source.getAdminLogin(), 5, 900));
         result.put(Category.REGISTRATION, policy(source.getRegistration(), 5, 3600));
         result.put(Category.GUEST_LINK, policy(source.getGuestLink(), 120, 300));
+        result.put(Category.GUEST_REGISTRATION, policy(source.getGuestRegistration(), 20, 900));
+        result.put(Category.GUEST_BOOKING_CHANGE, policy(source.getGuestBookingChange(), 10, 900));
         result.put(Category.OTP_REQUEST, policy(source.getOtpRequest(), 5, 900));
         result.put(Category.OTP_VERIFY, policy(source.getOtpVerify(), 10, 900));
         result.put(Category.RETURNING_GUEST_LOOKUP, policy(source.getReturningGuestLookup(), 5, 900));

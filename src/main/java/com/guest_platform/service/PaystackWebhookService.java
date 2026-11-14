@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 
 import com.guest_platform.exception.ConflictException;
 import com.guest_platform.exception.WebhookAuthenticationException;
+import com.guest_platform.security.PublicRateLimiter;
+import com.guest_platform.security.PublicRateLimiter.Category;
+import com.guest_platform.security.RateLimitExceededException;
 import com.guest_platform.service.payment.PaystackApiClient;
 
 import tools.jackson.core.JacksonException;
@@ -29,21 +32,27 @@ public class PaystackWebhookService {
     private final PaystackApiClient paystackApiClient;
     private final PaymentService paymentService;
     private final HostPayoutExecutionService hostPayoutExecutionService;
+    private final PublicRateLimiter rateLimiter;
 
     public PaystackWebhookService(@Value("${app.payments.paystack.mode:mock}") String mode,
             @Value("${app.payments.paystack.secret-key:}") String secretKey, ObjectMapper objectMapper,
             PaystackApiClient paystackApiClient, PaymentService paymentService,
-            HostPayoutExecutionService hostPayoutExecutionService) {
+            HostPayoutExecutionService hostPayoutExecutionService, PublicRateLimiter rateLimiter) {
         this.mode = mode;
         this.secretKey = secretKey;
         this.objectMapper = objectMapper;
         this.paystackApiClient = paystackApiClient;
         this.paymentService = paymentService;
         this.hostPayoutExecutionService = hostPayoutExecutionService;
+        this.rateLimiter = rateLimiter;
     }
 
     public void process(String signature, String payload) {
         verifySignature(signature, payload);
+        PublicRateLimiter.Decision limit = rateLimiter.check(Category.PAYSTACK_WEBHOOK, "paystack-webhook");
+        if (!limit.allowed()) {
+            throw new RateLimitExceededException(limit.retryAfterSeconds());
+        }
         JsonNode root = parse(payload);
         String event = root.path("event").asText();
         if ("transfer.success".equals(event) || "transfer.failed".equals(event) || "transfer.reversed".equals(event)) {

@@ -108,6 +108,28 @@ Do not log sensitive values unnecessarily.
 
 ---
 
+## Public rate limiting
+
+The public rate limiter is an in-process sliding-window limiter. Host login,
+admin login, and registration use normalized email identifiers hashed with
+SHA-256 and a distinct purpose prefix. Guest-link endpoints use SHA-256 token
+hashes for per-link isolation, including when socket peer information is
+unavailable. The filter checks for a stored token hash before allocating a
+guest-link bucket, so arbitrary nonexistent tokens do not consume limiter
+capacity. Raw email addresses and guest tokens are not limiter keys or limiter
+log values. Paystack events use the configured route-wide limit after signature
+verification, so invalid signatures do not consume its bucket.
+
+Network-level aggregate abuse protection remains a known limitation. Render
+may present shared proxy peers, and this application does not currently
+configure a verified client-IP trust path. The in-memory limits are per
+application instance; horizontal scaling weakens enforcement and must be
+reviewed before adding instances. Revisit aggregate abuse protection using
+production traffic evidence before introducing network-level limits or
+trusting forwarded client-IP headers.
+
+---
+
 ## 8. Error handling
 
 Do not expose:
