@@ -8,6 +8,7 @@ const SHELL_ASSETS = [
   '/css/components.css',
   '/css/pages.css',
   '/js/app.js',
+  '/js/offers.js',
   '/js/api.js',
   '/js/ui.js',
   '/images/hostvero-logo-clean.png',
@@ -43,7 +44,8 @@ function isSensitive(url) {
   return (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/admin/') ||
-    url.pathname.startsWith('/guest/')
+    url.pathname.startsWith('/guest/') ||
+    url.pathname.startsWith('/offer/')
   );
 }
 

@@ -23,6 +23,19 @@ import jakarta.persistence.UniqueConstraint;
 })
 public class Payment {
 
+    @Column(name = "reservation_resolution_required_at")
+    private Instant reservationResolutionRequiredAt;
+    public Instant getReservationResolutionRequiredAt() { return reservationResolutionRequiredAt; }
+    public boolean recordLateVerifiedSuccess(String eventId, Instant now) {
+        if (status == PaymentStatus.SUCCEEDED) return false;
+        status = PaymentStatus.SUCCEEDED;
+        providerEventId = eventId;
+        paidAt = now;
+        failureReason = null;
+        reservationResolutionRequiredAt = now;
+        return true;
+    }
+
     @Id
     private UUID id;
 

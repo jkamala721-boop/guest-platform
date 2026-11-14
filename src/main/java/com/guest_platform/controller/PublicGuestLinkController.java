@@ -43,6 +43,7 @@ import jakarta.validation.Valid;
 public class PublicGuestLinkController {
 
     private final GuestLinkService guestLinkService;
+    private final com.guest_platform.service.OfferReservationService offerReservations;
     private final GuestEmailVerificationService emailVerificationService;
     private final ReceiptService receiptService;
     private final BookingExtensionService extensionService;
@@ -53,7 +54,9 @@ public class PublicGuestLinkController {
     public PublicGuestLinkController(GuestLinkService guestLinkService, GuestEmailVerificationService emailVerificationService,
             ReceiptService receiptService,
             BookingExtensionService extensionService, PaymentService paymentService, AvailabilityService availabilityService,
-            ReturningGuestRecognitionService returningGuestRecognitionService) {
+            ReturningGuestRecognitionService returningGuestRecognitionService,
+            com.guest_platform.service.OfferReservationService offerReservations) {
+        this.offerReservations = offerReservations;
         this.guestLinkService = guestLinkService;
         this.emailVerificationService = emailVerificationService;
         this.receiptService = receiptService;
@@ -64,6 +67,12 @@ public class PublicGuestLinkController {
     @GetMapping("/{token}")
     public PublicGuestLinkResponse resolve(@PathVariable String token) {
         return guestLinkService.resolvePublic(token);
+    }
+
+    @PostMapping("/{token}/confirm-reservation")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void confirmReservation(@PathVariable String token) {
+        offerReservations.confirm(guestLinkService.resolveUsableGuestLink(token));
     }
 
     @PutMapping("/{token}/registration")

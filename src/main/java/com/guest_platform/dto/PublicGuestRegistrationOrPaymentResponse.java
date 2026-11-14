@@ -12,7 +12,7 @@ import com.guest_platform.entity.PaymentStatus;
 
 public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Instant expiresAt, boolean registrationRequired,
         boolean emailVerified, Instant emailVerificationResendAvailableAt, PropertyPreview property, StayPreview stay,
-        PaymentPreview payment, StayAccessDetails stayAccess) implements PublicGuestLinkResponse {
+        PaymentPreview payment, StayAccessDetails stayAccess, OfferReservation offerReservation) implements PublicGuestLinkResponse {
 
     public static PublicGuestRegistrationOrPaymentResponse from(GuestLink guestLink, PaymentStatus paymentStatus,
             long resendCooldownSeconds) {
@@ -26,7 +26,21 @@ public record PublicGuestRegistrationOrPaymentResponse(GuestLinkState state, Ins
                         guestLink.getBooking().getProperty().getAddress()),
                 new StayPreview(guestLink.getBooking().getCheckInDate(), guestLink.getBooking().getCheckOutDate()),
                 paymentPreview(guestLink, paymentStatus),
-                stayAccess(guestLink));
+                stayAccess(guestLink), offerReservation(guestLink));
+    }
+
+    public record OfferReservation(Instant checkoutHoldExpiresAt, Instant reservationConfirmedAt,
+            Instant paymentOpensAt, Instant paymentDeadlineAt, boolean paymentAllowed, boolean confirmationRequired,
+            String timeZone) { }
+
+    private static OfferReservation offerReservation(GuestLink link) {
+        var b = link.getBooking();
+        if (!b.isOfferBooking()) return null;
+        var now = Instant.now();
+        var opens = com.guest_platform.service.OfferBookingPolicy.paymentOpensAt(b);
+        return new OfferReservation(b.getCheckoutHoldExpiresAt(), b.getReservationConfirmedAt(), opens,
+                b.getPaymentDeadlineAt(), com.guest_platform.service.OfferBookingPolicy.canPay(b, now),
+                b.getReservationConfirmedAt() == null && opens.isAfter(now), "Africa/Nairobi");
     }
 
     private static PaymentPreview paymentPreview(GuestLink guestLink, PaymentStatus paymentStatus) {

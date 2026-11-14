@@ -133,7 +133,7 @@ public class SecurityConfig {
                                 "/site/**").permitAll()
                         .requestMatchers("/api/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/logout").permitAll()
-                        .requestMatchers("/api/public/guest/**").permitAll()
+                        .requestMatchers("/api/public/guest/**", "/api/public/offers/**", "/offer/**").permitAll()
                         .requestMatchers("/api/webhooks/mpesa", "/api/webhooks/stripe", "/api/webhooks/paystack").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->

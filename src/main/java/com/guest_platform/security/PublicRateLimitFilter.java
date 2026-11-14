@@ -23,16 +23,19 @@ import com.guest_platform.repository.GuestLinkRepository;
 public class PublicRateLimitFilter extends OncePerRequestFilter {
 
     private static final Pattern GUEST_TOKEN_PATH = Pattern.compile("^/api/public/guest/([^/]+)(.*)$");
+    private static final Pattern OFFER_TOKEN_PATH = Pattern.compile("^/api/public/offers/([^/]+)(.*)$");
     private static final Pattern EXTENSION_PAYMENT_PATH = Pattern.compile("^/extensions/[^/]+/payments$");
     private final PublicRateLimiter rateLimiter;
     private final ApiErrorWriter apiErrorWriter;
     private final GuestLinkRepository guestLinkRepository;
+    private final com.guest_platform.repository.PropertyOfferRepository offerRepository;
 
     public PublicRateLimitFilter(PublicRateLimiter rateLimiter, ApiErrorWriter apiErrorWriter,
-            GuestLinkRepository guestLinkRepository) {
+            GuestLinkRepository guestLinkRepository, com.guest_platform.repository.PropertyOfferRepository offerRepository) {
         this.rateLimiter = rateLimiter;
         this.apiErrorWriter = apiErrorWriter;
         this.guestLinkRepository = guestLinkRepository;
+        this.offerRepository = offerRepository;
     }
 
     @Override
@@ -60,6 +63,13 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
     private Optional<RequestLimit> limitFor(HttpServletRequest request) {
         String method = request.getMethod();
         String path = request.getRequestURI().substring(request.getContextPath().length());
+        Matcher offerPath = OFFER_TOKEN_PATH.matcher(path);
+        if (offerPath.matches()) {
+            String hash = PublicRateLimiter.hashIdentifier(offerPath.group(1));
+            if (!offerRepository.existsByTokenHash(hash)) return Optional.empty();
+            return Optional.of(new RequestLimit("/bookings".equals(offerPath.group(2))
+                    ? Category.GUEST_BOOKING_CHANGE : Category.GUEST_LINK, "offer:" + hash));
+        }
         Matcher guestPath = GUEST_TOKEN_PATH.matcher(path);
         if (!guestPath.matches()) return Optional.empty();
         String token = guestPath.group(1);
@@ -81,7 +91,8 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
             requestLimit = Optional.of(new RequestLimit(Category.RETURNING_GUEST_VERIFY, tokenKey));
         } else if ("POST".equals(method) && "/payments".equals(suffix)) {
             requestLimit = Optional.of(new RequestLimit(Category.PAYMENT_INITIALIZATION, tokenKey));
-        } else if ("POST".equals(method) && ("/extend".equals(suffix) || "/book-again".equals(suffix))) {
+        } else if ("POST".equals(method) && ("/extend".equals(suffix) || "/book-again".equals(suffix)
+                || "/confirm-reservation".equals(suffix))) {
             requestLimit = Optional.of(new RequestLimit(Category.GUEST_BOOKING_CHANGE, tokenKey));
         } else if ("POST".equals(method) && EXTENSION_PAYMENT_PATH.matcher(suffix).matches()) {
             requestLimit = Optional.of(new RequestLimit(Category.PAYMENT_INITIALIZATION, tokenKey));

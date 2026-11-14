@@ -40,6 +40,10 @@ class PublicRateLimitFilterTest {
         assertRateLimited(filter, "GET", "/api/public/guest/token-nine/availability");
         assertRateLimited(filter, "GET", "/api/public/guest/token-ten/receipt");
         assertRateLimited(filter, "GET", "/api/public/guest/token-eleven/receipt/document");
+        assertRateLimited(filter, "POST", "/api/public/guest/token-twelve/confirm-reservation");
+        assertRateLimited(filter, "GET", "/api/public/offers/offer-one");
+        assertRateLimited(filter, "POST", "/api/public/offers/offer-two/quote");
+        assertRateLimited(filter, "POST", "/api/public/offers/offer-three/bookings");
     }
 
     @Test
@@ -205,8 +209,10 @@ class PublicRateLimitFilterTest {
         properties.setOtpVerify(new Limit(1, 60));
         properties.setPaymentInitialization(new Limit(1, 60));
         properties.setPaystackWebhook(new Limit(1, 60));
+        var offers = org.mockito.Mockito.mock(com.guest_platform.repository.PropertyOfferRepository.class);
+        org.mockito.Mockito.when(offers.existsByTokenHash(org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
         return new PublicRateLimitFilter(new PublicRateLimiter(properties, clock),
-                new ApiErrorWriter(new ObjectMapper()), guestLinkRepository);
+                new ApiErrorWriter(new ObjectMapper()), guestLinkRepository, offers);
     }
 
     private GuestLinkRepository guestLinkRepository(BooleanSupplier tokenExists) {

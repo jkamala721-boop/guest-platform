@@ -1,4 +1,5 @@
 import { api, apiMany, del, get, post, put, ApiError } from './api.js';
+import { renderPublicOffer, hostOffersContent, bindHostOffers } from './offers.js';
 import { $, $$, badge, confirmDialog, emptyState, escapeHtml, formatDate, formatDateTime, formatMoney, openModal, setButtonBusy, titleCase, toast } from './ui.js';
 
 const app = $('#app');
@@ -1535,6 +1536,7 @@ async function renderBookingDetail(id) {
           </div>
 
           ${badge(payment.status)}
+          ${payment.reservationResolutionRequiredAt ? '<strong class="field-error">Late payment — manual resolution required. No payout initiated.</strong>' : ''}
         </div>
       `)
       .join('');
@@ -1635,9 +1637,12 @@ async function renderBookingDetail(id) {
             class="button secondary"
             data-edit-booking
             type="button"
+            ${booking.offerBooking ? 'disabled title="Cancel and create a new reservation to change dates or price"' : ''}
           >
             Edit booking
           </button>
+
+          ${booking.offerBooking && !hasSucceededPayment ? `<p class="muted">${booking.reservationConfirmedAt ? 'Reservation payment deadline' : 'Checkout hold expires'}: ${formatDateTime(booking.reservationConfirmedAt ? booking.paymentDeadlineAt : booking.checkoutHoldExpiresAt)}</p>` : ''}
 
           ${
             hasSucceededPayment
@@ -2580,6 +2585,14 @@ async function renderGuestForm(id) {
 }
 
 async function renderProperties(route) {
+  if (/^properties\/[^/]+\/offers$/.test(route)) {
+    const id = route.split('/')[1];
+    try {
+      app.innerHTML = hostShell('properties', await hostOffersContent(id));
+      bindShell(); bindHostOffers(id, () => renderProperties(route));
+    } catch (error) { showHostError('properties', error); }
+    return;
+  }
   if (route === 'properties/new') {
     return renderPropertyForm(null);
   }
@@ -2704,6 +2717,7 @@ async function renderProperties(route) {
 
 
           <div class="property-actions">
+            ${property.active ? `<a class="button small secondary" href="#/properties/${property.id}/offers">Share offer</a>` : ''}
 
             <a
               class="button small secondary"
@@ -5281,6 +5295,7 @@ async function renderPublicGuest() {
                   ? renderActiveStay(result, token)
                   : renderRegistrationStay(result, token)
               }
+              ${result.registrationRequired && result.offerReservation ? `<p class="public-form-note">Your checkout hold expires ${formatDateTime(result.offerReservation.checkoutHoldExpiresAt)}. Complete registration, then confirm your future reservation or pay if payment is open. Registration alone does not extend this hold.</p>` : ''}
 
             </div>
 
@@ -5526,6 +5541,15 @@ function renderRegistrationStay(result, token) {
 }
 
 function renderPaymentStay(result) {
+  if (result.offerReservation && !result.offerReservation.paymentAllowed) {
+    const r = result.offerReservation;
+    return `<section class="public-section"><h2>${r.confirmationRequired ? 'Confirm your reservation' : 'Reservation held until payment deadline'}</h2>
+      <p>Stay: ${formatDate(result.stay.checkInDate)} – ${formatDate(result.stay.checkOutDate)} · ${formatMoney(result.payment.amount, result.payment.currency)}</p>
+      ${renderEmailVerification(result)}
+      <p>Payment opens ${formatDateTime(r.paymentOpensAt)}. Pay before ${formatDateTime(r.paymentDeadlineAt)} to keep your reservation.</p>
+      ${r.confirmationRequired ? `<p>Confirm before your checkout hold expires at ${formatDateTime(r.checkoutHoldExpiresAt)}. Registration alone does not reserve your future stay.</p><button id="confirm-offer-reservation" class="button" type="button">Confirm reservation</button>` : '<p>Your reservation is confirmed pending payment. We will notify you when payment opens. Refresh this page at that time to pay.</p>'}
+      <p>Stay times use Africa/Nairobi; timestamps display in your device’s local time.</p></section>`;
+  }
   const paymentPending = result.payment.status !== 'PROCESSING';
   return `
     <section class="public-summary">
@@ -5535,6 +5559,7 @@ function renderPaymentStay(result) {
       <div class="public-summary-item"><span>Payment</span><div>${badge(result.payment.status)}</div></div>
     </section>
     ${renderEmailVerification(result)}
+    ${result.offerReservation ? `<p class="public-form-note">Complete payment before ${formatDateTime(result.offerReservation.reservationConfirmedAt ? result.offerReservation.paymentDeadlineAt : result.offerReservation.checkoutHoldExpiresAt)}. The reservation is released automatically at that deadline.</p>` : ''}
     ${result.stayAccess ? renderPrePaymentStayAccess(result.stayAccess) : ''}
     <section class="public-section">
       <header class="public-section-header">
@@ -5885,6 +5910,11 @@ function renderPropertyAccess(property) {
 function bindPublicForms() {
   const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
   const encodedToken = encodeURIComponent(token);
+  $('#confirm-offer-reservation')?.addEventListener('click', async event => {
+    const button = event.currentTarget; setButtonBusy(button, true);
+    try { await post(`/api/public/guest/${encodedToken}/confirm-reservation`, {}); await renderPublicGuest(); bindPublicForms(); }
+    catch (error) { toast(error.message, 'error'); setButtonBusy(button, false); }
+  });
 
   $('#public-registration')?.addEventListener('submit', async event => {
     event.preventDefault();
@@ -6104,6 +6134,7 @@ function showHostError(route, error) { if(handleOnboardingBlock(error))return;if
 function bindShell() { const sidebar=$('#host-sidebar'),backdrop=$('#mobile-menu-backdrop'),menu=$('#mobile-menu-button');const closeMenu=()=>{sidebar?.classList.remove('mobile-open');if(backdrop)backdrop.hidden=true;if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation menu');}};menu?.addEventListener('click',()=>{const open=!sidebar.classList.contains('mobile-open');sidebar.classList.toggle('mobile-open',open);backdrop.hidden=!open;menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu');});backdrop?.addEventListener('click',closeMenu);$$('#host-sidebar a').forEach(link=>link.addEventListener('click',closeMenu));[menu,sidebar].forEach(element=>element?.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();}));$('#install-hostvero')?.addEventListener('click',async()=>{if(state.installPrompt){await state.installPrompt.prompt();await state.installPrompt.userChoice;state.installPrompt=null;renderRoute();return;}openModal({title:'Install Hostvero on iPhone',body:'<p>Open the Share menu in Safari, then choose <strong>Add to Home Screen</strong>.</p>'});});$('#logout-button')?.addEventListener('click', async () => { try { await post('/api/auth/logout', {}); } catch { /* Server logout is idempotent; always return to sign-in. */ } state.host = null; state.onboarding=null;state.operationalAccess=null;state.verification=null; go('login'); }); }
 
 async function renderRoute() {
+  if (location.pathname.startsWith('/offer/')) return renderPublicOffer();
   if (isPublicRoute()) { await renderPublicGuest(); bindPublicForms(); return; }
   const route = hashRoute(); if (route === 'login' || route === 'register') { try{state.host=await get('/api/me');await routeForOnboarding();return;}catch(_){state.host=null;state.onboarding=null;state.operationalAccess=null;state.verification=null;renderAuth(route);return;} }
   try { state.host = state.host || await get('/api/me'); await loadHostAccessState(); } catch (error) { state.host = null; state.onboarding=null;state.operationalAccess=null;state.verification=null; go('login'); if (error?.code === 'AUTH_SESSION_EXPIRED') toast('Your session has expired. Please sign in again.', 'error'); return; }

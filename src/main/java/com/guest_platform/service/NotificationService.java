@@ -1,7 +1,6 @@
 package com.guest_platform.service;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -208,15 +207,15 @@ public class NotificationService {
         // A booking is valid before its guest completes the secure-link
         // registration. Guest notifications cannot be delivered without a
         // recipient, so defer scheduling until registration attaches one.
-        if (booking.getGuest() == null) {
+        if (booking.getGuest() == null || (booking.isOfferBooking()
+                && (OfferBookingPolicy.expired(booking, now) || (booking.isAwaitingOfferPayment()
+                && booking.getReservationConfirmedAt() == null)))) {
             notificationRepository.findAllByBookingId(booking.getId()).forEach(Notification::cancel);
             return;
         }
 
-        Instant checkInAt = booking.getCheckInDate().atTime(booking.getProperty().getCheckInTime())
-                .toInstant(ZoneOffset.UTC);
-        Instant checkOutAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
-                .toInstant(ZoneOffset.UTC);
+        Instant checkInAt = OfferBookingPolicy.checkInAt(booking);
+        Instant checkOutAt = OfferBookingPolicy.checkOutAt(booking);
 
         sync(booking, NotificationType.TWO_DAY_REMINDER, checkInAt.minusSeconds(48 * 60 * 60),
                 isUpcoming(booking, checkInAt, now), now);
@@ -224,7 +223,8 @@ public class NotificationService {
                 requiresPayment(booking, checkInAt, now), now);
         sync(booking, NotificationType.PAYMENT_REMINDER,
                 checkInAt.minusSeconds(paymentReminderHoursBeforeCheckIn * 60 * 60),
-                requiresPayment(booking, checkInAt, now), now);
+                requiresPayment(booking, checkInAt, now) && (!booking.isOfferBooking()
+                        || checkInAt.minusSeconds(paymentReminderHoursBeforeCheckIn * 3600).isBefore(booking.getPaymentDeadlineAt())), now);
         sync(booking, NotificationType.CHECKOUT_REMINDER, checkOutAt.minusSeconds(60 * 60),
                 isCheckoutCandidate(booking, checkOutAt, now), now);
     }
@@ -316,10 +316,9 @@ public class NotificationService {
 
     private boolean isRelevantAtDelivery(Notification notification, Instant now) {
         Booking booking = notification.getBooking();
-        Instant checkInAt = booking.getCheckInDate().atTime(booking.getProperty().getCheckInTime())
-                .toInstant(ZoneOffset.UTC);
-        Instant checkOutAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
-                .toInstant(ZoneOffset.UTC);
+        Instant checkInAt = OfferBookingPolicy.checkInAt(booking);
+        Instant checkOutAt = OfferBookingPolicy.checkOutAt(booking);
+        if (booking.isOfferBooking() && OfferBookingPolicy.expired(booking, now)) return false;
         return switch (notification.getType()) {
             case TWO_DAY_REMINDER -> isUpcoming(booking, checkInAt, now);
             case TWENTY_FOUR_HOUR_PAYMENT_REQUEST, PAYMENT_REMINDER -> requiresPayment(booking, checkInAt, now);
@@ -334,7 +333,9 @@ public class NotificationService {
     }
 
     private boolean requiresPayment(Booking booking, Instant checkInAt, Instant now) {
-        return booking.getStatus() == BookingStatus.PENDING_PAYMENT && checkInAt.isAfter(now);
+        return booking.getStatus() == BookingStatus.PENDING_PAYMENT && checkInAt.isAfter(now)
+                && (!booking.isOfferBooking() || (booking.getReservationConfirmedAt() != null
+                && !OfferBookingPolicy.expired(booking, now)));
     }
 
     private boolean isCheckoutCandidate(Booking booking, Instant checkOutAt, Instant now) {

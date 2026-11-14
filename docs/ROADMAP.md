@@ -1,5 +1,12 @@
 # Hostvero Development Roadmap
 
+Current approved increment: **Phase 2 — Guest Booking Experience, Stage 1**.
+See [Property offers and guest-selected dates](PROPERTY_OFFERS_STAGE1.md) for the
+approved checkout holds, reservation deadlines, API and migration details. The
+numbered phases below describe the earlier foundational roadmap; the current
+increment adds to that implemented foundation. Photographs, AI features, advanced
+pricing and later stages are outside this increment.
+
 ## Phase 0 — Foundation
 
 Goals:

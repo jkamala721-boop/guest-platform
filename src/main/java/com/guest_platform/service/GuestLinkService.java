@@ -5,7 +5,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.UUID;
@@ -38,6 +37,8 @@ import com.guest_platform.repository.GuestRepository;
 
 @Service
 public class GuestLinkService {
+
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -91,8 +92,7 @@ public class GuestLinkService {
         String token = newToken();
         // Property time zones are not modelled yet. Checkout is therefore interpreted as UTC
         // consistently for all links until a per-property timezone is introduced.
-        Instant expiresAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
-                .toInstant(ZoneOffset.UTC);
+        Instant expiresAt = OfferBookingPolicy.checkOutAt(booking);
         GuestLink guestLink = guestLinkRepository.save(new GuestLink(booking, hash(token), expiresAt));
         if (hasVerifiedPaymentForConfirmedBooking(booking)) {
             guestLink.activate();
@@ -103,16 +103,14 @@ public class GuestLinkService {
     @Transactional
     public GuestLinkCreateResponse createForNewBooking(Booking booking) {
         String token = newToken();
-        Instant expiresAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
-                .toInstant(ZoneOffset.UTC);
+        Instant expiresAt = OfferBookingPolicy.checkOutAt(booking);
         GuestLink guestLink = guestLinkRepository.save(new GuestLink(booking, hash(token), expiresAt));
         return new GuestLinkCreateResponse(token, guestLink.getState(), guestLink.getExpiresAt());
     }
 
     @Transactional
     public void synchronizeExpiryForBooking(Booking booking) {
-        Instant expiresAt = booking.getCheckOutDate().atTime(booking.getProperty().getCheckOutTime())
-                .toInstant(ZoneOffset.UTC);
+        Instant expiresAt = OfferBookingPolicy.checkOutAt(booking);
         guestLinkRepository.findAllByBookingId(booking.getId()).forEach(link -> link.extendExpiry(expiresAt));
     }
 
@@ -134,6 +132,14 @@ public class GuestLinkService {
     @Transactional
     public void updateGuestRegistration(String token, PublicGuestRegistrationRequest request) {
         GuestLink guestLink = resolveUsableGuestLink(token);
+
+        if (guestLink.getBooking().isOfferBooking()) {
+            entityManager.refresh(guestLink.getBooking(), jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            entityManager.refresh(guestLink);
+            if (OfferBookingPolicy.expired(guestLink.getBooking(), Instant.now())
+                    || guestLink.getBooking().getStatus() == BookingStatus.CANCELLED || !guestLink.isUsableAt(Instant.now()))
+                throw new ConflictException("Reservation has expired");
+        }
 
         if (guestLink.getState() != GuestLinkState.REGISTRATION_OR_PAYMENT) {
             throw new ConflictException("Guest registration is no longer available");
@@ -210,7 +216,8 @@ public class GuestLinkService {
     public GuestLink resolveUsableGuestLink(String token) {
         GuestLink guestLink = guestLinkRepository.findByTokenHash(hash(token))
                 .orElseThrow(() -> new ResourceNotFoundException("Guest link was not found"));
-        if (guestLink.getBooking().getStatus() == BookingStatus.CANCELLED || guestLink.getRevokedAt() != null) {
+        if (guestLink.getBooking().getStatus() == BookingStatus.CANCELLED || guestLink.getRevokedAt() != null
+                || OfferBookingPolicy.expired(guestLink.getBooking(), Instant.now())) {
             throw new ResourceNotFoundException("Guest link was not found");
         }
         if (!guestLink.isUsableAt(Instant.now())) {

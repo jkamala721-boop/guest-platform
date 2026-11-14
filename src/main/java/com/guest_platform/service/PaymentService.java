@@ -1,5 +1,7 @@
 package com.guest_platform.service;
 
+import java.time.Instant;
+
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.math.BigDecimal;
@@ -34,6 +36,8 @@ import com.guest_platform.service.payment.PaymentProviderAdapter;
 
 @Service
 public class PaymentService {
+
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
@@ -133,6 +137,7 @@ public class PaymentService {
     public PaymentResponse confirmCashPayment(UUID hostId, UUID bookingId) {
         Booking booking = bookingRepository.findForUpdateByIdAndHostId(bookingId, hostId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        requireOfferPaymentEligibility(booking);
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new ConflictException("Cancelled bookings cannot be paid.");
         }
@@ -213,6 +218,7 @@ public class PaymentService {
 
     private PaymentInitiationResponse beginPayment(Booking booking, BookingExtension extension,
             PaymentInitiateRequest request, String returnUrl) {
+        if (extension == null) requireOfferPaymentEligibility(booking);
         PaymentProviderAdapter provider = providers.get(request.provider());
         if (provider == null) {
             throw new IllegalArgumentException("Unsupported payment provider");
@@ -258,6 +264,23 @@ public class PaymentService {
         }
         Booking booking = bookingRepository.findForUpdateById(payment.getBooking().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking was not found"));
+        if (booking.isOfferBooking() && payment.getBookingExtension() == null) {
+            entityManager.refresh(booking, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            entityManager.find(com.guest_platform.entity.Property.class, booking.getProperty().getId(),
+                    jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            Instant now = Instant.now();
+            if (OfferBookingPolicy.expired(booking, now) || !booking.isAwaitingOfferPayment()) {
+                if (payment.recordLateVerifiedSuccess(eventId, now)) {
+                    if (booking.isAwaitingOfferPayment()) booking.cancel();
+                    if (booking.getStatus() == BookingStatus.CANCELLED) {
+                        guestLinkService.revokeUsableLinksForCancelledBooking(booking);
+                        notificationService.cancelPendingForBooking(booking.getId());
+                    }
+                    receiptService.createForSucceededPayment(payment);
+                }
+                return;
+            }
+        }
         if (payment.getBookingExtension() == null && booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
             return;
         }
@@ -277,6 +300,15 @@ public class PaymentService {
         hostPayoutService.queueForVerifiedPayment(payment);
         if (payment.getBookingExtension() == null) {
             hostNotificationService.paymentConfirmed(booking, payment.getId());
+        }
+    }
+
+    private void requireOfferPaymentEligibility(Booking booking) {
+        if (booking.isOfferBooking()) {
+            entityManager.refresh(booking, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (!OfferBookingPolicy.canPay(booking, Instant.now())) {
+                throw new ConflictException("Payment is not open or the reservation deadline has passed");
+            }
         }
     }
 

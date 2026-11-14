@@ -32,6 +32,29 @@ public class Booking {
     @JoinColumn(name = "property_id", nullable = false)
     private Property property;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "offer_id")
+    private PropertyOffer offer;
+    @Column(name = "checkout_hold_expires_at") private Instant checkoutHoldExpiresAt;
+    @Column(name = "reservation_confirmed_at") private Instant reservationConfirmedAt;
+    @Column(name = "payment_deadline_at") private Instant paymentDeadlineAt;
+
+    public void attachOffer(PropertyOffer offer, Instant holdExpiry, Instant paymentDeadline) {
+        this.offer = offer; this.checkoutHoldExpiresAt = holdExpiry; this.paymentDeadlineAt = paymentDeadline;
+    }
+    public void identifyOfferAttempt(UUID attemptId) {
+        if (offer == null || id != null || attemptId == null) throw new IllegalStateException("Invalid checkout attempt");
+        id = attemptId;
+    }
+    public boolean isOfferBooking() { return offer != null; }
+    public boolean isAwaitingOfferPayment() {
+        return status == BookingStatus.PENDING_CONFIRMATION || status == BookingStatus.PENDING_PAYMENT;
+    }
+    public Instant getCheckoutHoldExpiresAt() { return checkoutHoldExpiresAt; }
+    public Instant getReservationConfirmedAt() { return reservationConfirmedAt; }
+    public Instant getPaymentDeadlineAt() { return paymentDeadlineAt; }
+    public void confirmOfferReservation(Instant now) { if (reservationConfirmedAt == null) reservationConfirmedAt = now; }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "guest_id", nullable = true)
     private Guest guest;
