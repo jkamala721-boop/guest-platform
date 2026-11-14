@@ -129,6 +129,9 @@ public class BookingService {
     @Transactional
     public BookingResponse update(UUID hostId, UUID bookingId, BookingUpdateRequest request) {
         Booking booking = findOwnedBookingForUpdate(hostId, bookingId);
+        if (booking.isOfferBooking()) {
+            throw new ConflictException("Offer reservations cannot be repriced or rescheduled; cancel and create a new reservation.");
+        }
         Property property = findActiveOwnedProperty(hostId, request.propertyId());
         property = propertyRepository.findForUpdateById(property.getId()).orElseThrow(() -> new ResourceNotFoundException("Property was not found"));
         availabilityService.requireAvailableFor(request.status(), property.getId(), request.checkInDate(),

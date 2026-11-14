@@ -67,6 +67,9 @@ public class WebPageController {
     @GetMapping("/guest/{token}")
     public String guest() { return "forward:/index.html"; }
 
+    @GetMapping("/offer/{token}")
+    public String offer() { return "forward:/index.html"; }
+
     @GetMapping({"/admin", "/admin/"})
     public String admin() { return "forward:/admin/index.html"; }
 

@@ -21,7 +21,11 @@ public record BookingResponse(
         String notes,
         String checkoutReminderMessage,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        boolean offerBooking,
+        Instant checkoutHoldExpiresAt,
+        Instant reservationConfirmedAt,
+        Instant paymentDeadlineAt) {
     public static BookingResponse from(Booking booking) {
 
         return new BookingResponse(
@@ -37,7 +41,9 @@ public record BookingResponse(
                 booking.getNotes(),
                 booking.getCheckoutReminderMessage(),
                 booking.getCreatedAt(),
-                booking.getUpdatedAt()
+                booking.getUpdatedAt(),
+                booking.isOfferBooking(), booking.getCheckoutHoldExpiresAt(),
+                booking.getReservationConfirmedAt(), booking.getPaymentDeadlineAt()
         );
     }
 }

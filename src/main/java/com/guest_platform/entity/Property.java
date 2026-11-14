@@ -157,6 +157,7 @@ public class Property {
 
     public void deactivate() { this.active = false; }
     public UUID getId() { return id; }
+    public Host getHost() { return host; }
     public String getName() { return name; }
     public PropertyType getPropertyType() { return propertyType; }
     public String getAddress() { return address; }

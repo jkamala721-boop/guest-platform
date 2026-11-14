@@ -80,11 +80,8 @@ public class AvailabilityService {
 
     public boolean isAvailable(UUID propertyId, LocalDate checkInDate, LocalDate checkOutDate,
             UUID excludedBookingId) {
-        boolean conflict = excludedBookingId == null
-                ? bookingRepository.existsByPropertyIdAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(
-                        propertyId, BLOCKING_STATUSES, checkOutDate, checkInDate)
-                : bookingRepository.existsByPropertyIdAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThanAndIdNot(
-                        propertyId, BLOCKING_STATUSES, checkOutDate, checkInDate, excludedBookingId);
+        boolean conflict = bookingRepository.hasBlockingReservation(propertyId, BLOCKING_STATUSES,
+                checkInDate, checkOutDate, excludedBookingId, java.time.Instant.now());
         boolean reservedExtension = bookingExtensionRepository
                 .existsByBookingPropertyIdAndStatusAndExpiresAtAfterAndOriginalCheckOutDateLessThanAndRequestedCheckOutDateGreaterThan(
                         propertyId, BookingExtensionStatus.PENDING_PAYMENT, java.time.Instant.now(), checkOutDate, checkInDate);
@@ -96,6 +93,7 @@ public class AvailabilityService {
         List<UnavailableDateRangeResponse> ranges = new ArrayList<>();
         bookingRepository.findAll().stream().filter(booking -> booking.getProperty().getId().equals(propertyId))
                 .filter(booking -> booking.getStatus().blocksAvailability())
+                .filter(booking -> !OfferBookingPolicy.expired(booking, java.time.Instant.now()))
                 .filter(booking -> booking.getCheckInDate().isBefore(to) && booking.getCheckOutDate().isAfter(from))
                 .map(booking -> new UnavailableDateRangeResponse(booking.getCheckInDate(), booking.getCheckOutDate()))
                 .forEach(ranges::add);

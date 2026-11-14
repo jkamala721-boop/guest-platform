@@ -21,6 +21,27 @@ import com.guest_platform.entity.BookingStatus;
 
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
+    @Query("""
+            select count(b) > 0 from Booking b where b.property.id = :propertyId
+            and b.status in :statuses and b.checkInDate < :checkOut and b.checkOutDate > :checkIn
+            and coalesce(b.id <> :excluded, true) = true
+            and (b.offer is null or b.status not in (com.guest_platform.entity.BookingStatus.PENDING_CONFIRMATION,
+                com.guest_platform.entity.BookingStatus.PENDING_PAYMENT)
+                or (b.reservationConfirmedAt is null and b.checkoutHoldExpiresAt > :now)
+                or (b.reservationConfirmedAt is not null and b.paymentDeadlineAt > :now))
+            """)
+    boolean hasBlockingReservation(@Param("propertyId") UUID propertyId,
+            @Param("statuses") Collection<BookingStatus> statuses, @Param("checkIn") LocalDate checkIn,
+            @Param("checkOut") LocalDate checkOut, @Param("excluded") UUID excluded, @Param("now") Instant now);
+
+    @Query("""
+            select b.id from Booking b where b.offer is not null
+            and b.status in (com.guest_platform.entity.BookingStatus.PENDING_CONFIRMATION, com.guest_platform.entity.BookingStatus.PENDING_PAYMENT)
+            and ((b.reservationConfirmedAt is null and b.checkoutHoldExpiresAt <= :now)
+                or (b.reservationConfirmedAt is not null and b.paymentDeadlineAt <= :now))
+            """)
+    List<UUID> findExpiredOfferBookingIds(@Param("now") Instant now);
+
     boolean existsByGuestIdAndHostId(UUID guestId, UUID hostId);
     List<Booking> findAllByHostIdOrderByCreatedAtDesc(UUID hostId);
     Optional<Booking> findByIdAndHostId(UUID id, UUID hostId);

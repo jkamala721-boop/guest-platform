@@ -1,5 +1,8 @@
 # Hostvero API Specification
 
+For the Phase 2 Stage 1 property-offer APIs and offer-created booking policies, see
+[Property offers](PROPERTY_OFFERS_STAGE1.md#api-additions).
+
 This file defines the initial API direction.
 
 Exact payloads can be refined during implementation, but major resource boundaries should remain stable.
