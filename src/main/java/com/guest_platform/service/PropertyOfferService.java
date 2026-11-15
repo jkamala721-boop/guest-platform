@@ -75,6 +75,12 @@ public class PropertyOfferService {
     }
     @Transactional(readOnly=true)
     public OfferView preview(String token) { return OfferView.from(usable(token)); }
+    public record GalleryAccess(UUID propertyId, Instant expiresAt) { }
+    @Transactional(readOnly=true)
+    public GalleryAccess galleryAccess(String token) {
+        PropertyOffer offer = usable(token);
+        return new GalleryAccess(offer.getProperty().getId(), offer.getExpiresAt());
+    }
     @Transactional(readOnly=true)
     public Quote quote(String token, Dates dates) { return calculate(usable(token), dates, Instant.now()); }
     @Transactional

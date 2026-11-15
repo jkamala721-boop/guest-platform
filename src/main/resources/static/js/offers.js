@@ -1,4 +1,5 @@
 import { get, post } from './api.js';
+import { mountGallery } from './photos.js';
 import { $, escapeHtml, formatMoney, formatDateTime, setButtonBusy, toast } from './ui.js';
 
 // Offer links identify reusable terms; a reservation always receives its own guest link.
@@ -13,12 +14,14 @@ export async function renderPublicOffer() {
       <section class="public-section"><h1>${escapeHtml(offer.propertyName)}</h1>
       <p>${formatMoney(offer.nightlyPrice, offer.currency)} per night · Offer expires ${formatDateTime(offer.expiresAt)}</p>
       <p>Choose your dates to check availability. Dates are reserved only when you continue to registration. All stay times use Africa/Nairobi.</p>
+      <div id="offer-photos"></div>
       <form id="offer-dates" class="public-registration-form"><div class="form-grid">
         <div class="field"><label for="offer-in">Check-in</label><input id="offer-in" type="date" name="checkInDate" required></div>
         <div class="field"><label for="offer-out">Check-out</label><input id="offer-out" type="date" name="checkOutDate" required></div>
       </div><button class="button" type="submit">Check dates and price</button></form>
       <div id="offer-quote" role="status" aria-live="polite"></div></section></div></main>`;
     const form = $('#offer-dates');
+    mountGallery($('#offer-photos'), `/api/public/offers/${token}/photos`);
     let attemptId = null;
     let attemptDates = null;
     form.addEventListener('input', () => { $('#offer-quote').replaceChildren(); });

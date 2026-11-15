@@ -247,3 +247,9 @@ PropertyBlock may later be useful for:
 - offline/unavailable periods
 
 Do not create it until needed.
+
+## Phase 2 Stage 2: property photographs
+
+Flyway V34 adds `property_photos` metadata/lifecycle; V35 enables RLS, denies Data
+API roles and enforces one READY cover per property. Image objects stay in private
+Storage, not PostgreSQL. See [photo lifecycle and backup requirements](PROPERTY_PHOTOS_STAGE2.md).

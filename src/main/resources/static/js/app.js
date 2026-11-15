@@ -1,5 +1,6 @@
 import { api, apiMany, del, get, post, put, ApiError } from './api.js';
 import { renderPublicOffer, hostOffersContent, bindHostOffers } from './offers.js';
+import { mountGallery, hostPhotosContent } from './photos.js';
 import { $, $$, badge, confirmDialog, emptyState, escapeHtml, formatDate, formatDateTime, formatMoney, openModal, setButtonBusy, titleCase, toast } from './ui.js';
 
 const app = $('#app');
@@ -2585,6 +2586,14 @@ async function renderGuestForm(id) {
 }
 
 async function renderProperties(route) {
+  if (/^properties\/[^/]+\/photos$/.test(route)) {
+    const id = route.split('/')[1];
+    try {
+      app.innerHTML = hostShell('properties', await hostPhotosContent(id));
+      bindShell(); mountGallery($('#property-photos'), `/api/properties/${id}/photos`, true);
+    } catch (error) { showHostError('properties', error); }
+    return;
+  }
   if (/^properties\/[^/]+\/offers$/.test(route)) {
     const id = route.split('/')[1];
     try {
@@ -2717,6 +2726,7 @@ async function renderProperties(route) {
 
 
           <div class="property-actions">
+            <a class="button small secondary" href="#/properties/${property.id}/photos">Photographs</a>
             ${property.active ? `<a class="button small secondary" href="#/properties/${property.id}/offers">Share offer</a>` : ''}
 
             <a
@@ -5290,6 +5300,8 @@ async function renderPublicGuest() {
 
             <div class="public-body">
 
+              <div id="guest-photos"></div>
+
               ${
                 isActive
                   ? renderActiveStay(result, token)
@@ -5313,6 +5325,7 @@ async function renderPublicGuest() {
       </main>
     `;
 
+    mountGallery($('#guest-photos'), `/api/public/guest/${encodeURIComponent(token)}/photos`);
   } catch {
     renderGuestUnavailable();
   }

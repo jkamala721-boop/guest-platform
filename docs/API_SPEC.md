@@ -176,3 +176,9 @@ Hosts may access only their own:
 - receipts
 
 Public guest-link endpoints use secure guest tokens instead of host authentication.
+
+## Phase 2 Stage 2: property photographs
+
+Owner photo-management and token-scoped offer/guest gallery endpoints are specified
+in [Property photographs and guest gallery](PROPERTY_PHOTOS_STAGE2.md#api).
+All upload processing and Storage credentials stay on the backend.

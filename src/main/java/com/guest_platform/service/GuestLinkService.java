@@ -129,6 +129,22 @@ public class GuestLinkService {
         return PublicGuestRegistrationOrPaymentResponse.from(guestLink, status, emailVerificationResendCooldownSeconds);
     }
 
+    public record GalleryAccess(UUID propertyId, Instant expiresAt) { }
+    @Transactional
+    public GalleryAccess galleryAccess(String token) {
+        GuestLink link = resolveUsableGuestLink(token);
+        var property = link.getBooking().getProperty();
+        if (!property.isActive() || !property.getHost().isActive())
+            throw new ResourceNotFoundException("Guest link was not found");
+        Instant expiry = link.getExpiresAt();
+        if (link.getBooking().isOfferBooking() && link.getBooking().isAwaitingOfferPayment()) {
+            Instant deadline = link.getBooking().getReservationConfirmedAt() == null
+                    ? link.getBooking().getCheckoutHoldExpiresAt() : link.getBooking().getPaymentDeadlineAt();
+            if (deadline != null && deadline.isBefore(expiry)) expiry = deadline;
+        }
+        return new GalleryAccess(property.getId(), expiry);
+    }
+
     @Transactional
     public void updateGuestRegistration(String token, PublicGuestRegistrationRequest request) {
         GuestLink guestLink = resolveUsableGuestLink(token);
