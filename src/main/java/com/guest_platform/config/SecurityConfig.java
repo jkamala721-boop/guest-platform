@@ -115,6 +115,7 @@ public class SecurityConfig {
             ApiErrorWriter apiErrorWriter,
             @org.springframework.beans.factory.annotation.Value("${app.site.public-hosts:hostvero.net,www.hostvero.net}")
             String publicHostNames,
+            com.guest_platform.service.photo.PhotoSettings photos,
             @Qualifier("hostveroCorsConfigurationSource") CorsConfigurationSource corsConfigurationSource) throws Exception {
         java.util.Set<String> publicHosts = java.util.Arrays.stream(publicHostNames.split(","))
                 .map(String::trim).map(String::toLowerCase).filter(value -> !value.isBlank())
@@ -142,7 +143,7 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .addHeaderWriter((request, response) -> response.setHeader("Content-Security-Policy",
                                 isPublicMarketingRequest(request, publicHosts)
-                                        ? MARKETING_CONTENT_SECURITY_POLICY : CONTENT_SECURITY_POLICY))
+                                        ? MARKETING_CONTENT_SECURITY_POLICY : photos.imagePolicy(CONTENT_SECURITY_POLICY)))
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                         .permissionsPolicyHeader(permissions -> permissions.policy(PERMISSIONS_POLICY))
                         .contentTypeOptions(Customizer.withDefaults())

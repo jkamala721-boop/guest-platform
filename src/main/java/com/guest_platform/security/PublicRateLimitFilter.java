@@ -77,7 +77,7 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
         String tokenKey = PublicRateLimiter.hashIdentifier("hostvero:guest-link:" + token);
         Optional<RequestLimit> requestLimit = Optional.empty();
         if ("GET".equals(method) && (suffix.isEmpty() || "/availability".equals(suffix)
-                || "/receipt".equals(suffix) || "/receipt/document".equals(suffix))) {
+                || "/receipt".equals(suffix) || "/receipt/document".equals(suffix) || "/photos".equals(suffix))) {
             requestLimit = Optional.of(new RequestLimit(Category.GUEST_LINK, tokenKey));
         } else if ("PUT".equals(method) && "/registration".equals(suffix)) {
             requestLimit = Optional.of(new RequestLimit(Category.GUEST_REGISTRATION, tokenKey));

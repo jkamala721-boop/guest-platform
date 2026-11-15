@@ -21,3 +21,12 @@ The browser stores the host bearer token in `sessionStorage`, never in source
 code or a URL. Static host pages contain no protected data; every host record is
 loaded through existing authenticated APIs. Public guest pages render only the
 state-specific DTO returned by the existing token-scoped API.
+
+## Phase 2 Stage 2 gallery
+
+`js/photos.js` provides host photo management and the responsive offer/guest gallery.
+Host route: `#/properties/{id}/photos`. The shared API helper accepts FormData without
+setting a JSON Content-Type. The fullscreen viewer uses a native modal dialog with
+keyboard/touch navigation. Signed URLs remain in view memory; service-worker shell
+v3 caches only static modules, not private images or gallery responses. See
+[Stage 2 behavior and manual acceptance](PROPERTY_PHOTOS_STAGE2.md).

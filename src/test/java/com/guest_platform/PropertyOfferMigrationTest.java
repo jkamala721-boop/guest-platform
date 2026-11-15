@@ -45,7 +45,8 @@ class PropertyOfferMigrationTest {
                     UUID.randomUUID(), host, booking, payment, UUID.randomUUID().toString());
         }
         Map<String, List<String>> before = snapshot(jdbc);
-        Flyway flyway = Flyway.configure().dataSource(dataSource).locations(locations).load();
+        // Historical Stage 1 upgrade remains explicitly V31 -> V33 as newer migrations are added.
+        Flyway flyway = Flyway.configure().dataSource(dataSource).locations(locations).target("33").load();
         assertEquals(2, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertEquals(before, snapshot(jdbc));

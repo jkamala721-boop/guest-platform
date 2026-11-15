@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hostvero-shell-v2';
+const CACHE_NAME = 'hostvero-shell-v3';
 
 const SHELL_ASSETS = [
   '/offline.html',
@@ -9,6 +9,7 @@ const SHELL_ASSETS = [
   '/css/pages.css',
   '/js/app.js',
   '/js/offers.js',
+  '/js/photos.js',
   '/js/api.js',
   '/js/ui.js',
   '/images/hostvero-logo-clean.png',

@@ -30,6 +30,17 @@ import org.springframework.http.HttpHeaders;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(com.guest_platform.service.photo.PhotoUnavailableException.class)
+    ResponseEntity<ApiErrorResponse> photosUnavailable() {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, "PHOTOS_UNAVAILABLE",
+                "Photographs are temporarily unavailable. Please retry.", null, true, null);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiErrorResponse> photoTooLarge() {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE",
+                "Choose a JPEG or PNG photograph no larger than 10 MiB.", null, false, null);
+    }
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(RateLimitExceededException.class)
@@ -154,7 +165,8 @@ public class ApiExceptionHandler {
         return response(HttpStatus.UNAUTHORIZED, "AUTH_REQUIRED", "Please sign in to continue.", null, false, null);
     }
 
-    @ExceptionHandler({ IllegalArgumentException.class, HttpMessageNotReadableException.class })
+    @ExceptionHandler({ IllegalArgumentException.class, HttpMessageNotReadableException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class })
     ResponseEntity<ApiErrorResponse> invalidInput(Exception exception) {
         return response(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please check your request and try again.", null, false, null);
     }
